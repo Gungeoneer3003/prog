@@ -37,7 +37,7 @@ int getColor(char* data, int rwb, int rgb, int x, int y) {
     return data[c + rgb];
 }
 
-int interpolate(char* data, int rwb, int rgb, float x, float y) {
+unsigned char interpolate(char* data, int rwb, int rgb, float x, float y) {
     float dx = x - trunc(x);
     float dy = y - trunc(y);
 
@@ -48,10 +48,10 @@ int interpolate(char* data, int rwb, int rgb, float x, float y) {
     int y2 = y + (1-dy);
 
     //Colors, which also must be integers
-    int left_upper = get_color(data, rwb, rgb,x1,y2);
-    int right_upper = get_color(data, rwb, rgb,x2,y2);
-    int left_lower = get_color(data, rwb, rgb,x1,y1);
-    int right_lower = get_color(data, rwb, rgb,x2,y1);
+    int left_upper = getColor(data, rwb, rgb,x1,y2);
+    int right_upper = getColor(data, rwb, rgb,x2,y2);
+    int left_lower = getColor(data, rwb, rgb,x1,y1);
+    int right_lower = getColor(data, rwb, rgb,x2,y1);
 
     //Interpolate 
     float left = left_upper * (1 - dy) + left_lower * dy;
@@ -61,16 +61,20 @@ int interpolate(char* data, int rwb, int rgb, float x, float y) {
     return result;
 }
 
-void imageProcess(int i, int n, LONG w, LONG h, int rwb, char* data, char* newData) {
+void imageProcess(int i, int n, LONG w, LONG h, int rwb1, int rwb2, char* data1, char* data2, float ratio, float scaleX, float scaleY, char* newData) {
     for (int x = i * w / n; x < (i + 1) * w / n; x++)
     {
         for (int y = 0; y < h; y++)
         {
-            int c = x * 3 + y * rwb; // c for cursor
+            int c = x * 3 + y * rwb1; // c for cursor
 
-            newData[c] = data[c];
-            newData[c + 1] = data[c + 1];
-            newData[c + 2] = data[c + 2];
+            int r2 = interpolate(data2, rwb2, 2, x * scaleX, y * scaleY);
+            int g2 = interpolate(data2, rwb2, 1, x * scaleX, y * scaleY);
+            int b2 = interpolate(data2, rwb2, 0, x * scaleX, y * scaleY);
+
+            newData[c] = (unsigned char)(data1[c] * ratio + b2 * (1 - ratio));
+            newData[c + 1] = (unsigned char)(data1[c + 1] * ratio + g2 * (1 - ratio));
+            newData[c + 2] = (unsigned char)(data1[c + 2] * ratio + r2 * (1 - ratio));
         }
     }
 }
@@ -78,7 +82,7 @@ void imageProcess(int i, int n, LONG w, LONG h, int rwb, char* data, char* newDa
 
 int main(int argc, char** argv) {
     //Hard coded inputs 
-    float ratio = 0.3;
+    float ratio = 0;
     char* input1 = "lion.bmp";
     char* input2 = "flowers.bmp";
     int n = 1;
@@ -103,6 +107,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    FILE* f2 = fopen(input2, "rb");
+    if(f2 == NULL) {
+        fclose(f1);
+        perror("Failed to open the file.");
+        return 1;
+    }
+
     //Take BMP Input1
     BITMAPFILEHEADER fh1;
     BITMAPINFOHEADER fih1;
@@ -116,29 +127,59 @@ int main(int argc, char** argv) {
     fread(&fih1, sizeof(fih1), 1, f1);
 
     char* data1 = (char*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
-    fread(data1, fih.biSizeImage, 1, f1);
+    fread(data1, fih1.biSizeImage, 1, f1);
 
     fclose(f1);
 
     //Find real width bytes for the first
-    int byteWidth = fih.biWidth * 3;
+    int byteWidth = fih1.biWidth * 3;
     int padding = 4 - byteWidth % 4;
     if(padding == 4)
         padding = 0;
     int rwb1 = byteWidth + padding;
 
-    LONG w1 = fih.biWidth;
-    LONG h1 = fih.biHeight;
+    LONG w1 = fih1.biWidth;
+    LONG h1 = fih1.biHeight;
 
-    //Handle input2
+
+    //Take BMP Input2
+    BITMAPFILEHEADER fh2;
+    BITMAPINFOHEADER fih2;
+
+    fread(&fh2.bfType, 2, 1, f2);
+    fread(&fh2.bfSize, 4, 1, f2);
+    fread(&fh2.bfReserved1, 2, 1, f2);
+    fread(&fh2.bfReserved2, 2, 1, f2);
+    fread(&fh2.bfOffBits, 4, 1, f2);
+
+    fread(&fih2, sizeof(fih2), 1, f2);
+
+    char* data2 = (char*)mmap(NULL,fih2.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    fread(data2, fih2.biSizeImage, 1, f2);
+
+    fclose(f2);
+
+    //Find real width bytes for the second
+    byteWidth = fih2.biWidth * 3;
+    padding = 4 - byteWidth % 4;
+    if(padding == 4)
+        padding = 0;
+    int rwb2 = byteWidth + padding;
+
+    LONG w2 = fih2.biWidth;
+    LONG h2 = fih2.biHeight;
 
     //Create result image memory
     char* newData = (char*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 
     //Handle sizing
+    float scaleX = (float)w2 / (float)w1;
+    float scaleY = (float)h2 / (float)h1;
+
 
     //Process Image
-    imageProcess(0, 1, w1, h1, rwb1, data, newData);
+    imageProcess(0, 1, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData);
+
 
     //Create bmp file
     FILE* lastFile = fopen(output, "wb");
@@ -151,14 +192,14 @@ int main(int argc, char** argv) {
 
     fwrite(&fih1, sizeof(fih1), 1, lastFile);
 
-    fwrite(newData, fih.biSizeImage, 1, lastFile);
+    fwrite(newData, fih1.biSizeImage, 1, lastFile);
 
     fclose(lastFile);
 
 
     //Close up shop
     munmap(data1, fih1.biSizeImage);
-    //munmap(data2, fih2.biSizeImage);
+    munmap(data2, fih2.biSizeImage);
     munmap(newData, fih1.biSizeImage); 
     return 0;
 }
