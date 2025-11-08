@@ -67,20 +67,11 @@ BYTE *mymalloc(int size)
     {
         chunkinfo *PrevPtr = NULL;
 
-        while (ListPtr != NULL)
-        {
-            if (properSize > ListPtr->size | ListPtr->inuse == 1)
-            {
-                PrevPtr = ListPtr;
-                ListPtr = ListPtr->next;
-                continue;
-            }
-            else
-                break;
-        }
+        ListPtr = smallestMatchingChunk(size);
 
         if (ListPtr == NULL)
         {
+            PrevPtr = get_last_chunk();
             ListPtr = sbrk(0);
             sbrk(sizeof(chunkinfo));
 
@@ -97,13 +88,10 @@ BYTE *mymalloc(int size)
         }
         else
         {
-            int initialSize = ListPtr->size;
-        
-            //I recognize there should be something here on splitting it if it was too big, but I was short on time
-            if(initialSize > properSize) {
+            if (ListPtr->size > properSize) {
                 ListPtr->size -= properSize;
                 BYTE* move = (BYTE*) ListPtr;
-                move += ListPtr->size;
+                move += ListPtr->size; //This would still be a multiple of 4096
 
                 chunkinfo* newPtr = (chunkinfo*) move;
                 newPtr->size = properSize;
@@ -111,16 +99,19 @@ BYTE *mymalloc(int size)
                 newPtr->prev = ListPtr;
                 newPtr->next = ListPtr->next;
 
+                newPtr++;
+                BYTE *data = (BYTE *)ListPtr;
                 
-
+                return data;
             }
+            else {
+                ListPtr->inuse = 1;
 
-            ListPtr->inuse = 1;
+                ListPtr++;
+                BYTE *data = (BYTE *)ListPtr;
 
-            ListPtr++;
-            BYTE *data = (BYTE *)ListPtr;
-
-            return data;
+                return data;
+            }
         }
     }
 }
@@ -238,6 +229,25 @@ void myfree(BYTE *addr)
         }
     }
 }
+
+//Based on the provided get_last_chunk() function
+chunkinfo *smallestMatchingChunk(int size) // you can change it when you aim for performance
+{
+    if (!startofheap) // I have a global void *startofheap = NULL;
+        return NULL;
+    chunkinfo *ch = (chunkinfo *)startofheap;
+    chunkinfo *smallest = ch; 
+    
+    for (; ch->next; ch = (chunkinfo *)ch->next) {
+        if(ch->inuse == 0 && ch->size >= size) {
+            if(ch->size <= smallest->size) 
+                smallest = ch;
+        }
+    }
+
+    return smallest;
+}
+
 
 void main()
 {
