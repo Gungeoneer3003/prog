@@ -20,12 +20,33 @@ chunkinfo *get_last_chunk() // you can change it when you aim for performance
     return ch;
 }
 
+// Based on the provided get_last_chunk() function
+chunkinfo *smallestMatchingChunk(int size)
+{
+    if (!startofheap) // I have a global void *startofheap = NULL;
+        return NULL;
+    chunkinfo *ch = (chunkinfo *)startofheap;
+    chunkinfo *smallest = NULL;
+
+    for (; ch->next; ch = (chunkinfo *)ch->next)
+    {
+        if (ch->inuse == 0 && ch->size >= size)
+        {
+            if (smallest == NULL || ch->size <= smallest->size)
+                smallest = ch;
+        }
+    }
+
+    return smallest;
+}
+
 void analyze()
 {
     printf("\n--------------------------------------------------------------\n");
     if (!startofheap)
     {
         printf("no heap");
+        printf(", program break on address: %x\n", sbrk(0));
         return;
     }
     chunkinfo *ch = (chunkinfo *)startofheap;
@@ -44,10 +65,12 @@ void analyze()
 BYTE *mymalloc(int size)
 {
     printf("");
-    int pageCount = ((size+sizeof(chunkinfo)) / 4096) + 1;
+    int pageCount = ((size + sizeof(chunkinfo)) / 4096) + 1;
     int properSize = pageCount * 4096;
 
     chunkinfo *ListPtr = startofheap;
+
+    // Check if there's nothing in the heap
     if (startofheap == NULL)
     {
         ListPtr = sbrk(0);
@@ -63,191 +86,113 @@ BYTE *mymalloc(int size)
 
         return NewPtr;
     }
+
+    // Look for if there's a suitable and free chunk
+    chunkinfo *PrevPtr = NULL;
+    ListPtr = smallestMatchingChunk(size);
+
+    // No such chunk
+    if (ListPtr == NULL)
+    {
+        PrevPtr = get_last_chunk();
+        ListPtr = sbrk(0);
+        sbrk(sizeof(chunkinfo));
+
+        ListPtr->inuse = 1;
+        ListPtr->size = properSize;
+        ListPtr->next = NULL;
+        ListPtr->prev = PrevPtr;
+
+        PrevPtr->next = ListPtr;
+
+        BYTE *NewPtr = sbrk(properSize - sizeof(chunkinfo));
+
+        return NewPtr;
+    }
+
+    // There's one available and it's the smallest
+
+    // Split the chunk if necessary
+    if (ListPtr->size > properSize)
+    {
+        ListPtr->size -= properSize;
+        BYTE *move = (BYTE *)ListPtr;
+        move += ListPtr->size; // This would still be a multiple of 4096
+
+        chunkinfo *newPtr = (chunkinfo *)move;
+        newPtr->size = properSize;
+        newPtr->inuse = 1;
+        newPtr->prev = ListPtr;
+        newPtr->next = ListPtr->next;
+
+        if (ListPtr->next != NULL)
+            (ListPtr->next)->prev = newPtr;
+        ListPtr->next = newPtr;
+        
+        newPtr++;
+        BYTE *data = (BYTE *)newPtr;
+
+        return data;
+    }
+    // No splitting needed
     else
     {
-        chunkinfo *PrevPtr = NULL;
+        ListPtr->inuse = 1;
 
-        ListPtr = smallestMatchingChunk(size);
+        ListPtr++;
+        BYTE *data = (BYTE *)ListPtr;
 
-        if (ListPtr == NULL)
-        {
-            PrevPtr = get_last_chunk();
-            ListPtr = sbrk(0);
-            sbrk(sizeof(chunkinfo));
-
-            ListPtr->inuse = 1;
-            ListPtr->size = properSize;
-            ListPtr->next = NULL;
-            ListPtr->prev = PrevPtr;
-
-            PrevPtr->next = ListPtr;
-
-            BYTE *NewPtr = sbrk(properSize - sizeof(chunkinfo));
-
-            return NewPtr;
-        }
-        else
-        {
-            if (ListPtr->size > properSize) {
-                ListPtr->size -= properSize;
-                BYTE* move = (BYTE*) ListPtr;
-                move += ListPtr->size; //This would still be a multiple of 4096
-
-                chunkinfo* newPtr = (chunkinfo*) move;
-                newPtr->size = properSize;
-                newPtr->inuse = 1;
-                newPtr->prev = ListPtr;
-                newPtr->next = ListPtr->next;
-
-                newPtr++;
-                BYTE *data = (BYTE *)ListPtr;
-                
-                return data;
-            }
-            else {
-                ListPtr->inuse = 1;
-
-                ListPtr++;
-                BYTE *data = (BYTE *)ListPtr;
-
-                return data;
-            }
-        }
+        return data;
     }
 }
 
 void myfree(BYTE *addr)
 {
-    // Find the chunkinfo (the linked list)
-    chunkinfo *cursor = (chunkinfo *)addr;
-    cursor--;
+    if (addr == NULL)
+        return;
 
-    // Set inuse to 0
-    cursor->inuse = 0;
+    chunkinfo *ch = (chunkinfo *)addr - 1;
+    ch->inuse = 0;
 
-    // Set up var's
-    chunkinfo *precursor = cursor->prev;
-    chunkinfo *postcursor = cursor->next;
+    chunkinfo *postCursor = ch->next;
+    chunkinfo *preCursor = ch->prev;
 
-    // Check if there's an empty one before
-    if (precursor == NULL)
+    // Handle the next chunk
+    if (postCursor && postCursor->inuse == 0)
     {
-        if (postcursor == NULL)
-        {
-            brk(cursor);
+        ch->size += postCursor->size;
+        ch->next = postCursor->next;
+
+        if (postCursor->next != NULL)
+            (postCursor->next)->prev = ch;
+    }
+
+    // Handle the previous chunk
+    if (preCursor && preCursor->inuse == 0)
+    {
+        preCursor->size += ch->size;
+        preCursor->next = ch->next;
+
+        if (ch->next != NULL)
+            (ch->next)->prev = preCursor;
+
+        ch = preCursor;
+    }
+
+    postCursor = ch->next;
+    preCursor = ch->prev;
+
+    // Return memory if it's the last chunk
+    if (postCursor == NULL)
+    {
+        brk(ch);
+
+        if (preCursor == NULL)
             startofheap = NULL;
-            // brk, this is the only one
-        }
         else
-        {
-            if (postcursor->inuse == 0)
-            {
-                // Pre doesn't exist, post does and is 0
-                if (postcursor->next != 0)
-                {
-                    cursor->size = cursor->size + postcursor->size;
-                    cursor->next = postcursor->next;
-                    (postcursor->next)->prev = cursor;
-                }
-                // Combine the last two, as the next is inevitably in use
-                else
-                    brk(cursor); // sbrk, remove the last ones
-            }
-            else
-            {
-                // Next is in use, nothing to do
-            }
-        }
-    }
-    else
-    {
-        // Precursor isn't null
-        if (precursor->inuse == 0)
-        {
-            if (postcursor == NULL)
-            {
-                brk(precursor);
-                if(precursor == startofheap)
-                    startofheap = NULL;
-                // brk, it's only the first two
-            }
-            else
-            {
-                if (postcursor->inuse == 0)
-                {
-                    // both pre and post exist and are 0
-                    if (postcursor->next != 0)
-                    {
-                        precursor->size = precursor->size + cursor->size + postcursor->size;
-                        precursor->next = postcursor->next; // Combine all three, as the next is inevitably in use
-                        (postcursor->next)->prev = precursor;
-                    }
-                    else {
-                        brk(precursor); // brk, remove all three
-                        if(precursor == startofheap)
-                            startofheap = NULL;
-                    }
-                }
-                else
-                {
-                    precursor->size = precursor->size + cursor->size;
-                    precursor->next = postcursor;
-                    postcursor->prev = precursor;
-                    // Combine the first two
-                }
-            }
-        }
-        else
-        {
-            if (postcursor == NULL)
-            {
-                brk(precursor);
-                if(precursor == startofheap)
-                    startofheap = NULL;
-                // brk, and remove the first
-            }
-            else
-            {
-                if (postcursor->inuse == 0)
-                {
-                    // both pre and post exist, post is 0
-                    if (postcursor->next != 0)
-                    {
-                        cursor->size = cursor->size + postcursor->size;
-                        cursor->next = postcursor->next;
-                        (postcursor->next)->prev = cursor;
-                    }
-                    // Combine the last 2, as the next is inevitably in use
-                    else
-                        brk(cursor); // sbrk, remove the last 2
-                }
-                else
-                {
-                    // Do nothing
-                }
-            }
-        }
+            preCursor->next = NULL;
     }
 }
-
-//Based on the provided get_last_chunk() function
-chunkinfo *smallestMatchingChunk(int size) // you can change it when you aim for performance
-{
-    if (!startofheap) // I have a global void *startofheap = NULL;
-        return NULL;
-    chunkinfo *ch = (chunkinfo *)startofheap;
-    chunkinfo *smallest = ch; 
-    
-    for (; ch->next; ch = (chunkinfo *)ch->next) {
-        if(ch->inuse == 0 && ch->size >= size) {
-            if(ch->size <= smallest->size) 
-                smallest = ch;
-        }
-    }
-
-    return smallest;
-}
-
 
 void main()
 {
