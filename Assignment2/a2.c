@@ -223,6 +223,10 @@ int main(int argc, char** argv) {
     float scaleX = (float)w2 / (float)w1;
     float scaleY = (float)h2 / (float)h1;
 
+    //Set up timer 
+    struct timeval tv1, tv2;
+    gettimeofday(&tv1, NULL);
+
     //Process Image
     while (i > 0) {
         int pid = fork();
@@ -241,6 +245,11 @@ int main(int argc, char** argv) {
     imageProcess(i, n, w1, h1, w2, h2, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData);
     printf("Parent Ends Here\n");
     while(wait(0) != -1);    
+
+    //Stop timer
+    gettimeofday(&tv2, NULL);
+    long long timing = (tv2.tv_sec - tv1.tv_sec) * 1000000LL + (tv2.tv_usec - tv1.tv_usec);
+    printf("The operation took %lld microseconds.\n", timing);
 
     //Create bmp file
     FILE* lastFile = fopen(output, "wb");
