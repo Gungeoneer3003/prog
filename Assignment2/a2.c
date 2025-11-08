@@ -119,6 +119,8 @@ int main(int argc, char** argv) {
     int n = 1;
     char* output = "result2.bmp";
 
+    int i = n - 1;
+
     //Checking inputs
     if(ratio < 0 | ratio > 1) {
         printf("The ratio is invalid. Try again\n");
@@ -216,17 +218,28 @@ int main(int argc, char** argv) {
     //Create result image memory
     char* newData = (char*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 
-    //Handle sizing
+    //Scale factors
     float scaleX = (float)w2 / (float)w1;
     float scaleY = (float)h2 / (float)h1;
 
-
     //Process Image
-    // for(int i = n - 1; i > 0; i--) {
-    // imageProcess(0, 1, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
-    // }
+    while (i > 0) {
+        int pid = fork();
 
-    imageProcess(0, n, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
+        if(pid == 0) {
+            printf("Child starts\n");
+            imageProcess(i, n, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
+            printf("Child Ends\n");
+            return 0;
+        }
+        i--;
+    }
+
+    //The parent does the first chunk
+    printf("Parent Starts\n");
+    imageProcess(i, n, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
+    printf("Parent Ends Here\n");
+    while(wait(0) != -1);    
 
     //Create bmp file
     FILE* lastFile = fopen(output, "wb");
