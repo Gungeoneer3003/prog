@@ -114,10 +114,10 @@ int main(int argc, char** argv) {
 
     //Hard coded inputs 
     float ratio = 0.3;
-    char* input1 = "flowers.bmp";
-    char* input2 = "Mario.bmp";
+    char* input1 = "Mario.bmp";
+    char* input2 = "flowers.bmp";
     int n = 1;
-    char* output = "result.bmp";
+    char* output = "result2.bmp";
 
     //Checking inputs
     if(ratio < 0 | ratio > 1) {
@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
         fih2 = fih1;
         fih1 = fihTemp;
 
-        BITMAPINFOHEADER fhTemp = fh2;
+        BITMAPFILEHEADER fhTemp = fh2;
         fh2 = fh1;
         fh1 = fhTemp;
 
