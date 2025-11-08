@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+typedef unsigned char BYTE;
 typedef unsigned short WORD;
 typedef unsigned int DWORD;
 typedef unsigned int LONG;
@@ -31,13 +32,13 @@ DWORD biClrUsed; //number of colors used by th ebitmap
 DWORD biClrImportant; //number of colors that are important
 } typedef BITMAPINFOHEADER;
 
-unsigned char getColor(char* data, int rwb, int rgb, int x, int y) {
+BYTE getColor(BYTE* data, int rwb, int rgb, int x, int y) {
     int c = x * 3 + y * rwb;
 
     return data[c + rgb];
 }
 
-unsigned char interpolate(char* data, int rwb, int rgb, float x, float y, LONG w, LONG h) {
+BYTE interpolate(BYTE* data, int rwb, int rgb, float x, float y, LONG w, LONG h) {
     float dx = x - floor(x);
     float dy = y - floor(y);
 
@@ -51,15 +52,15 @@ unsigned char interpolate(char* data, int rwb, int rgb, float x, float y, LONG w
     if(y2 >= h) y2 = y1;
 
     //Colors, which also must be integers
-    unsigned char left_upper = getColor(data, rwb, rgb,x1,y2);
-    unsigned char right_upper = getColor(data, rwb, rgb,x2,y2);
-    unsigned char left_lower = getColor(data, rwb, rgb,x1,y1);
-    unsigned char right_lower = getColor(data, rwb, rgb,x2,y1);
+    BYTE left_upper = getColor(data, rwb, rgb,x1,y2);
+    BYTE right_upper = getColor(data, rwb, rgb,x2,y2);
+    BYTE left_lower = getColor(data, rwb, rgb,x1,y1);
+    BYTE right_lower = getColor(data, rwb, rgb,x2,y1);
 
     //Interpolate 
     float left = left_upper * (dy) + left_lower * (1- dy);
     float right = right_upper * (dy) + right_lower * (1-dy);
-    unsigned char result = left * (1-dx) + right * (dx);
+    BYTE result = left * (1-dx) + right * (dx);
 
     // if (result == 255)
     //     printf("Here at %f %f\n", x, y);
@@ -67,30 +68,30 @@ unsigned char interpolate(char* data, int rwb, int rgb, float x, float y, LONG w
     return result;
 }
 
-void imageProcess(int i, int n, LONG w, LONG h, int rwb1, int rwb2, char* data1, char* data2, float ratio, float scaleX, float scaleY, char* newData, LONG w2, LONG h2) {
-    for (int x = i * w / n; x < (i + 1) * w / n; x++)
+void imageProcess(int i, int n, LONG w1, LONG h1, LONG w2, LONG h2, int rwb1, int rwb2, BYTE* data1, BYTE* data2, float ratio, float scaleX, float scaleY, BYTE* newData) {
+    for (int x = i * w1 / n; x < (i + 1) * w1 / n; x++)
     {
-        for (int y = 0; y < h; y++)
+        for (int y = 0; y < h1; y++)
         {
             int c = x * 3 + y * rwb1; // c for cursor
 
-            unsigned char r2 = interpolate(data2, rwb2, 2, x * scaleX, y * scaleY, w2, h2);
-            unsigned char g2 = interpolate(data2, rwb2, 1, x * scaleX, y * scaleY, w2, h2);
-            unsigned char b2 = interpolate(data2, rwb2, 0, x * scaleX, y * scaleY, w2, h2);
+            BYTE r2 = interpolate(data2, rwb2, 2, x * scaleX, y * scaleY, w2, h2);
+            BYTE g2 = interpolate(data2, rwb2, 1, x * scaleX, y * scaleY, w2, h2);
+            BYTE b2 = interpolate(data2, rwb2, 0, x * scaleX, y * scaleY, w2, h2);
 
             // if((r2 < 255 && r2 > 0) || (g2 < 255 && g2 > 0) || (b2 < 255 && b2 > 0))
             //     printf("Here\n");
-            float firstBlue = ((unsigned char)data1[c]) * ratio;
-            float firstGreen = ((unsigned char)data1[c+1]) * ratio;
-            float firstRed = ((unsigned char)data1[c+2]) * ratio;
+            float firstBlue = data1[c] * ratio;
+            float firstGreen = data1[c+1] * ratio;
+            float firstRed = data1[c+2] * ratio;
 
             float secondBlue = b2 * (1-ratio);
             float secondGreen = g2 * (1- ratio);
             float secondRed = r2 * (1-ratio);
 
-            unsigned char blue = (unsigned char)(firstBlue + secondBlue);
-            unsigned char green = (unsigned char)(firstGreen + secondGreen);
-            unsigned char red = (unsigned char)(firstRed + secondRed);
+            BYTE blue = (BYTE)(firstBlue + secondBlue);
+            BYTE green = (BYTE)(firstGreen + secondGreen);
+            BYTE red = (BYTE)(firstRed + secondRed);
 
             newData[c] = blue;
             newData[c + 1] = green;
@@ -102,22 +103,22 @@ void imageProcess(int i, int n, LONG w, LONG h, int rwb1, int rwb2, char* data1,
 
 int main(int argc, char** argv) {
     //Terminal Inputs
-    // if (argc < 6) {
-    //     printf("Insufficient arguments, try again.");
-    //     return 0;
-    // }
-    // char* input1 = argv[1];
-    // char* input2 = argv[2];
-    // float ratio = atof(argv[3]);
-    // int n = atoi(argv[4]);
-    // char* output = argv[5];
+    if (argc < 6) {
+        printf("Insufficient arguments, try again.\n");
+        return 0;
+    }
+    char* input1 = argv[1];
+    char* input2 = argv[2];
+    float ratio = atof(argv[3]);
+    int n = atoi(argv[4]);
+    char* output = argv[5];
 
     //Hard coded inputs 
-    float ratio = 0.3;
-    char* input1 = "Mario.bmp";
-    char* input2 = "flowers.bmp";
-    int n = 1;
-    char* output = "result2.bmp";
+    // float ratio = 0.3;
+    // char* input1 = "Mario.bmp";
+    // char* input2 = "lion.bmp";
+    // int n = 4;
+    // char* output = "result5.bmp";
 
     int i = n - 1;
 
@@ -158,7 +159,7 @@ int main(int argc, char** argv) {
 
     fread(&fih1, sizeof(fih1), 1, f1);
 
-    char* data1 = (char*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    BYTE* data1 = (BYTE*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
     fread(data1, fih1.biSizeImage, 1, f1);
 
     fclose(f1);
@@ -175,7 +176,7 @@ int main(int argc, char** argv) {
 
     fread(&fih2, sizeof(fih2), 1, f2);
 
-    char* data2 = (char*)mmap(NULL,fih2.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    BYTE* data2 = (BYTE*)mmap(NULL,fih2.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
     fread(data2, fih2.biSizeImage, 1, f2);
 
     fclose(f2);
@@ -190,7 +191,7 @@ int main(int argc, char** argv) {
         fh2 = fh1;
         fh1 = fhTemp;
 
-        char* dataTemp = data2;
+        BYTE* dataTemp = data2;
         data2 = data1;
         data1 = dataTemp;
     }
@@ -216,7 +217,7 @@ int main(int argc, char** argv) {
     LONG h2 = fih2.biHeight;
 
     //Create result image memory
-    char* newData = (char*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    BYTE* newData = (BYTE*)mmap(NULL,fih1.biSizeImage,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
 
     //Scale factors
     float scaleX = (float)w2 / (float)w1;
@@ -228,7 +229,7 @@ int main(int argc, char** argv) {
 
         if(pid == 0) {
             printf("Child starts\n");
-            imageProcess(i, n, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
+            imageProcess(i, n, w1, h1, w2, h2, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData);
             printf("Child Ends\n");
             return 0;
         }
@@ -237,7 +238,7 @@ int main(int argc, char** argv) {
 
     //The parent does the first chunk
     printf("Parent Starts\n");
-    imageProcess(i, n, w1, h1, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData, w2, h2);
+    imageProcess(i, n, w1, h1, w2, h2, rwb1, rwb2, data1, data2, ratio, scaleX, scaleY, newData);
     printf("Parent Ends Here\n");
     while(wait(0) != -1);    
 
