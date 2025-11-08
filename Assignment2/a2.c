@@ -101,13 +101,23 @@ void imageProcess(int i, int n, LONG w, LONG h, int rwb1, int rwb2, char* data1,
 
 
 int main(int argc, char** argv) {
+    //Terminal Inputs
+    // if (argc < 6) {
+    //     printf("Insufficient arguments, try again.");
+    //     return 0;
+    // }
+    // char* input1 = argv[1];
+    // char* input2 = argv[2];
+    // float ratio = atof(argv[3]);
+    // int n = atoi(argv[4]);
+    // char* output = argv[5];
+
     //Hard coded inputs 
     float ratio = 0.3;
     char* input1 = "flowers.bmp";
     char* input2 = "Mario.bmp";
     int n = 1;
     char* output = "result.bmp";
-
 
     //Checking inputs
     if(ratio < 0 | ratio > 1) {
@@ -151,17 +161,6 @@ int main(int argc, char** argv) {
 
     fclose(f1);
 
-    //Find real width bytes for the first
-    int byteWidth = fih1.biWidth * 3;
-    int padding = 4 - byteWidth % 4;
-    if(padding == 4)
-        padding = 0;
-    int rwb1 = byteWidth + padding;
-
-    LONG w1 = fih1.biWidth;
-    LONG h1 = fih1.biHeight;
-
-
     //Take BMP Input2
     BITMAPFILEHEADER fh2;
     BITMAPINFOHEADER fih2;
@@ -178,6 +177,31 @@ int main(int argc, char** argv) {
     fread(data2, fih2.biSizeImage, 1, f2);
 
     fclose(f2);
+
+    //Figure out which of the two is biggest and swap 
+    if(fih1.biWidth < fih2.biWidth) {
+        BITMAPINFOHEADER fihTemp = fih2;
+        fih2 = fih1;
+        fih1 = fihTemp;
+
+        BITMAPINFOHEADER fhTemp = fh2;
+        fh2 = fh1;
+        fh1 = fhTemp;
+
+        char* dataTemp = data2;
+        data2 = data1;
+        data1 = dataTemp;
+    }
+
+    //Find real width bytes for the first
+    int byteWidth = fih1.biWidth * 3;
+    int padding = 4 - byteWidth % 4;
+    if(padding == 4)
+        padding = 0;
+    int rwb1 = byteWidth + padding;
+
+    LONG w1 = fih1.biWidth;
+    LONG h1 = fih1.biHeight;
 
     //Find real width bytes for the second
     byteWidth = fih2.biWidth * 3;
