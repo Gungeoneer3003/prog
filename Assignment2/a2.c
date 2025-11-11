@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
     //Terminal Inputs
     if (argc < 6) {
         printf("Insufficient arguments, try again.\n");
+        printf("Usage: ./a2 input1.bmp input2.bmp ratio processors output.bmp\n");
         return 0;
     }
     char* input1 = argv[1];
