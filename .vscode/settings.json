@@ -6,6 +6,7 @@
         "wait.h": "c",
         "string.h": "c",
         "types.h": "c",
-        "fcntl.h": "c"
+        "fcntl.h": "c",
+        "stdlib.h": "c"
     }
 }
