@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     // int count = atoi(argv[2]);
     
     //Hard coded inputs
-    char* prog2 = "a3.2";
+    char* prog2 = "pltl8.2";
     int count = 3;
 
     char countStr[2];
@@ -29,12 +29,14 @@ int main(int argc, char** argv) {
 
     snprintf(countStr, sizeof(countStr), "%d", count);
 
-    char *newArgv[3];
-    newArgv[0] = processStr;
-    newArgv[1] = countStr;
-    newArgv[2] = NULL;
+    char *newArgv[6];
+    newArgv[0] = "2";
+    newArgv[1] = "2";
+    newArgv[2] = "Hello";
+    newArgv[3] = processStr;
+    newArgv[4] = countStr;
+    newArgv[5] = NULL;
     
-
     int i = 0;
     while (i < count) {
         snprintf(processStr, sizeof(processStr), "%d", i);
@@ -44,13 +46,14 @@ int main(int argc, char** argv) {
         if(pid == 0) {
             //printf("Child starts\n");
             execv(prog2, newArgv);
+            return 0;
         }
-        //printf("Started process %d\n", i);
         i++;
     }
 
+    //printf("Parent waiting for child processes to complete.\n");
     while(wait(0) != -1);   
-    
+    printf("\n");
 
     printf("All child processes have completed.\n");
     

@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mann.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#define SIZE 3
-
+#define SIZE 10
 
 //Prototypes
 void matrixMult(int** arr, int left, int right);
@@ -17,35 +16,39 @@ void printMatrix(int* arr);
 int main(int argc, char** argv) {
     int par_id = atoi(argv[0]);
     int par_count = atoi(argv[1]);
+    // int par_id = 0;
+    // int par_count = 1;
+
+    //printf("Process %d of %d starting (%d).\n", par_id, par_count, getpid());
     
-    int*** eq = {NULL, NULL, NULL};
+    int** eq = {NULL, NULL, NULL};
     char* operations[] = {"MAB", "BMA", "MBA"};
     int operCount = sizeof(operations) / sizeof(operations[0]);
     
     //Initialize var's consistent to both
     int fdM, fdA, fdB, fdFlag;
     int *M, *A, *B, *flag;
-    int **arr; //This will contain the in order eq (e.g. M = A * B)
+    int **arr = malloc(3 * sizeof(int*)); //This will contain the in order eq (e.g. M = A * B)
 
     
     if(par_id == 0) {
         //Initialize all four arrays using shm
         fdM = shm_open("M", O_CREAT | O_RDWR, 0777);
-        ftruncate(fdMatrix, SIZE * SIZE * sizeof(int));
-        M = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdMatrix,0);
+        ftruncate(fdM, SIZE * SIZE * sizeof(int));
+        M = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdM,0);
 
         fdA = shm_open("A", O_CREAT | O_RDWR, 0777);
-        ftruncate(fdMatrix, SIZE * SIZE * sizeof(int));
-        A = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdMatrix,0);
+        ftruncate(fdA, SIZE * SIZE * sizeof(int));
+        A = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdA,0);
 
         fdB = shm_open("B", O_CREAT | O_RDWR, 0777);
-        ftruncate(fdMatrix, SIZE * SIZE * sizeof(int));
-        B = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdMatrix,0);
+        ftruncate(fdB, SIZE * SIZE * sizeof(int));
+        B = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdB,0);
         
         //Initialize flag arr
         fdFlag = shm_open("flag", O_CREAT | O_RDWR, 0777);
-        ftruncate(fdFlag, sizeof(int) * par_count);
-        flag = (int*)mmap(0, sizeof(int) * count, PROT_READ | PROT_WRITE, MAP_SHARED, fdFlag, 0);
+        ftruncate(fdFlag, sizeof(int) * (par_count+1));
+        flag = (int*)mmap(0, sizeof(int) * (par_count+1), PROT_READ | PROT_WRITE, MAP_SHARED, fdFlag, 0);
 
         //Write random elements to each starting array
         for(int i = 0; i < SIZE; i++) {
@@ -66,6 +69,7 @@ int main(int argc, char** argv) {
         printMatrix(B);
     }
     else {
+        //printf("Now setting up fd's\n");
         //Set up what the variables would otherwise be
         fdM = -1;
         fdA = -1;
@@ -96,30 +100,54 @@ int main(int argc, char** argv) {
             if (fdFlag == -1)
                 sleep(1);
         }
+
+        //Set up arrays
+        M = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdM,0);
+        A = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdA,0);
+        B = (int*)mmap(NULL,SIZE * SIZE * sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED,fdB,0);
+        flag = (int*)mmap(0, sizeof(int) * (par_count+1), PROT_READ | PROT_WRITE, MAP_SHARED, fdFlag, 0);
+
+        //printf("Done setting up fd's\n");
     }
-
-    
-
 
     //Define bounds, which will be different for each
     int left = par_id * SIZE / par_count;
     int right = (par_id + 1) * SIZE / par_count;  
 
-    for(int i = 0; i < operCount; i++) {
-        flag[par_id] = 0;
-        operationMatch(arr, M, A, B, operations[i]);
+    //printf("Here %d has %d to %d\n", par_id, left, right);
 
+    gather(flag, par_id, par_count);
+    for(int i = 0; i < operCount; i++) {
+        
+        //Initial Set up
+        operationMatch(arr, M, A, B, operations[i]);
+        if(par_id == 0) {
+            for(int u = 0; u < SIZE; u++) {
+                for(int j = 0; j < SIZE; j++) {
+                    arr[0][u * SIZE + j] = 0;
+                }
+            }
+            
+        }
+
+        //printf("Process %d waiting at gather before operation %s\n", par_id, operations[i]);
+        gather(flag, par_id, par_count);
+
+        //printf("Process %d starting operation %s\n", par_id, operations[i]);
         matrixMult(arr, left, right);
+        //printf("Process %d finished operation %s\n", par_id, operations[i]);
 
         gather(flag, par_id, par_count);
-        printMatrix(arr[0]);
-    }
+        //printf("Past the %d gather\n", i);
 
-    
+        if(par_id == 0)
+            printMatrix(arr[0]);
+    }    
 
     //Close
+    free(arr);
     close(fdFlag);
-    munmap(flag, sizeof(int) * par_count);
+    munmap(flag, sizeof(int) * (par_count+1));
     close(fdM);
     munmap(M, SIZE * SIZE * sizeof(int));
     close(fdA);
@@ -175,12 +203,12 @@ void matrixMult(int** arr, int left, int right) {
     int* ans = arr[0];
     int* first = arr[1];
     int* second = arr[2];
-    
+
     //Each program should take up one row through this
     for(int k = 0; k < SIZE; k++) {
         for(int u = 0; u < SIZE; u++) {
-            for(int i = 0; i < SIZE; i++)
-                ans[k * SIZE + u] += first[i * SIZE + u] * B[k * SIZE + i];
+            for(int i = left; i < right; i++)
+                ans[k * SIZE + u] += first[k * SIZE + i] * second[i * SIZE + u];
         }
     }
 
@@ -188,18 +216,21 @@ void matrixMult(int** arr, int left, int right) {
 }
 
 void gather(int* flagArr, int id, int count) {
-    flagArr[id] = 1;
+    int synchid = flagArr[count] + 1;
+    flagArr[id] = synchid;
 
     while(1) {
-        sleep(1);
+        //sleep(1);
         int L = 1;
         for(int i = 0; i < count; i++) {
-            if(flag[i] == 0)
+            if(flagArr[i] < synchid)
                 L = 0;
         }
 
-        if(L)
+        if(L) {
+            flagArr[count] = synchid;
             break;
+        }
     }
 }
 
@@ -210,4 +241,5 @@ void printMatrix(int* arr) {
         }
         printf("\n");
     }
+    printf("\n");
 }
