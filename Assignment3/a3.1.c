@@ -12,17 +12,17 @@ int main(int argc, char** argv) {
     // 3. The number of processes is a small integer (less than 10).
 
     //Terminal commands
-    // if(argc < 3) {
-    //     printf("Insufficent arguments, please try again.\n");
-    //     printf("Usage: ./a3.1 [secondProgram] count.\n");
-    //     return 0;
-    // }
-    // char* prog2 = argv[1];
-    // int count = atoi(argv[2]);
+    if(argc < 3) {
+        printf("Insufficent arguments, please try again.\n");
+        printf("Usage: ./a3.1 [secondProgram] count.\n");
+        return 0;
+    }
+    char* prog2 = argv[1];
+    int count = atoi(argv[2]);
     
     //Hard coded inputs
-    char* prog2 = "a3.2";
-    int count = 3;
+    // char* prog2 = "a3.2";
+    // int count = 5;
 
     char countStr[2];
     char processStr[2];
@@ -33,7 +33,6 @@ int main(int argc, char** argv) {
     newArgv[0] = processStr;
     newArgv[1] = countStr;
     newArgv[2] = NULL;
-    
 
     int i = 0;
     while (i < count) {
@@ -53,7 +52,7 @@ int main(int argc, char** argv) {
     
 
     printf("All child processes have completed.\n");
-    
+
     //Conclude Program
     return 0;
 }

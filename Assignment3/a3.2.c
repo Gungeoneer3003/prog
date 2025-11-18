@@ -12,6 +12,8 @@ void matrixMult(int** arr, int left, int right);
 void operationMatch(int** arr, int* first, int* second, int* third, char* oper);
 void gather(int* flagArr, int id, int count);
 void printMatrix(int* arr);
+float det(const int *matrix, int cols, int rows);
+int *minor(const int *matrix, int skip_row, int skip_col, int cols, int rows);
 
 int main(int argc, char** argv) {
     int par_id = atoi(argv[0]);
@@ -117,6 +119,12 @@ int main(int argc, char** argv) {
     //printf("Here %d has %d to %d\n", par_id, left, right);
 
     gather(flag, par_id, par_count);
+
+    struct timeval tv1, tv2;
+    if(par_id == 0) {
+        gettimeofday(&tv1, NULL);
+    }
+
     for(int i = 0; i < operCount; i++) {
         
         //Initial Set up
@@ -144,6 +152,23 @@ int main(int argc, char** argv) {
             printMatrix(arr[0]);
     }    
 
+
+    gather(flag, par_id, par_count);
+
+    if(par_id == 0) {
+        gettimeofday(&tv2, NULL);
+        long long timing = (tv2.tv_sec - tv1.tv_sec) * 1000000LL + (tv2.tv_usec - tv1.tv_usec);
+        printf("The operation took %lld microseconds.\n", timing);
+    }
+
+    if(par_id == 0) {
+        printf("Now attempting to find the determinate.\n");
+        printf("Determinate is %f\n", det(M, SIZE, SIZE));
+    }
+
+    
+    
+    
     //Close
     free(arr);
     close(fdFlag);
@@ -242,4 +267,44 @@ void printMatrix(int* arr) {
         printf("\n");
     }
     printf("\n");
+}
+
+float det(const int *matrix, int cols, int rows) {
+    if(rows == 1 && cols == 1) {
+        return matrix[0];
+    }
+
+    if(rows == 2 && cols == 2) {
+        return matrix[0] * matrix[3] - matrix[1] * matrix[2];
+    }
+    
+
+    float ans = 0;
+
+    for(int j = 0; j < cols; j++) {
+        int sign = (j % 2 == 0) ? 1 : -1;
+        float coeff = sign * matrix[j];
+        int *m = minor(matrix, 0, j, cols, rows);
+        float subdet = det(m, cols - 1, rows - 1);
+        ans += coeff * subdet;
+        free(m);
+    }
+
+    return ans;
+}
+
+
+int *minor(const int *matrix, int skip_row, int skip_col, int cols, int rows) {
+    int minor_size = (cols - 1) * (rows - 1);
+    int *minor_matrix = malloc(minor_size * sizeof(int));
+    int index = 0;
+    for(int i = 0; i < rows; i++) {
+        for(int j = 0; j < cols; j++) {
+            if(i == skip_row || j == skip_col) {
+                continue;
+            }
+            minor_matrix[index++] = matrix[i * cols + j];
+        }
+    }
+    return minor_matrix;
 }
