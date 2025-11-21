@@ -32,22 +32,73 @@ DWORD biClrUsed; //number of colors used by th ebitmap
 DWORD biClrImportant; //number of colors that are important
 } typedef BITMAPINFOHEADER;
 
-void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int quality, BYTE* newData) {
+void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*);
+int f(int);
+
+
+void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, int** table) {
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             int c = x * 3 + y * rwb; // c for cursor
 
-            BYTE blue = data[c];
-            BYTE green = data[c + 1];
-            BYTE red = data[c + 2];
+            BYTE blue = data[c] / divisor;
+            BYTE green = data[c + 1] / divisor;
+            BYTE red = data[c + 2] / divisor;
+
+            //Store data in a table that has three arrays from [0, 255 / divisor]
+            table[0][blue] += 1;
+            table[1][green] += 1;
+            table[2][red] += 1;
 
             newData[c] = blue;
             newData[c + 1] = green;
             newData[c + 2] = red;
         }
     }
+}
+
+int f(int Quality) {
+    int d;
+
+    switch (Quality) {
+        case 1:
+            d = 25;
+            break;
+        case 2:
+            d = 22;
+            break;
+        case 3:
+            d = 17;
+            break;
+        case 4:
+            d = 13;
+            break;
+        case 5:
+            d = 10;
+            break;
+        case 6:
+            d = 7;
+            break;
+        case 7:
+            d = 5;
+            break;
+        case 8:
+            d = 4;
+            break;
+        case 9:
+            d = 2;
+            break;
+        case 10:
+            d = 1
+            break;
+        default:
+            printf("Invalid quality value. Please enter a number from 1 to 10.\n");
+    }
+
+
+    return d;
 }
 
 int main(int argc, char** argv) {
@@ -101,7 +152,12 @@ int main(int argc, char** argv) {
     //Create result image memory
     BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-    imageProcess(w, h, rwb, data, quality, newData);
+    
+    int d = f(quality)
+
+
+
+    imageProcess(w, h, rwb, data, divisor, newData);
 
     //Return the modified image with a different title
     char output[sizeof(input) / sizeof(char)];
