@@ -152,10 +152,7 @@ int main(int argc, char** argv) {
     //Create result image memory
     BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-    
     int d = f(quality)
-
-
 
     imageProcess(w, h, rwb, data, divisor, newData);
 
