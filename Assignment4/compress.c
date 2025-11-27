@@ -34,23 +34,61 @@ DWORD biClrImportant; //number of colors that are important
 
 void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*);
 int f(int);
+int cmp_hte(hte*, hte*);
 
+struct hte {
+    int frq, val;
+    hte *l, *r;
+} typedef hte;
 
-void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, int** table) {
+int cmp_hte(hte *a, hte *b) {
+    int aFrq = a->frq;
+    int bFrq = b->frq;
+    return (aFrq > bFrq) - (aFrq < bFrq); 
+}
+
+void pushNulls(hte **arr, int n) {
+    int write = 0;  // where the next non-null should go
+
+    for (int read = 0; read < n; read++) {
+        if (arr[read] != NULL) {
+            arr[write++] = arr[read];
+        }
+    }
+
+    // fill the rest with NULL
+    while (write < n) {
+        arr[write++] = NULL;
+    }
+}
+
+void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte** table) {
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             int c = x * 3 + y * rwb; // c for cursor
 
-            BYTE blue = data[c] / divisor;
-            BYTE green = data[c + 1] / divisor;
-            BYTE red = data[c + 2] / divisor;
+            int* bgr = {-1, -1, -1};
+            for(int i = 0; i < 3; i++)
+                bgr[i] = data[c + i] / divisor;
 
             //Store data in a table that has three arrays from [0, 255 / divisor]
-            table[0][blue] += 1;
-            table[1][green] += 1;
-            table[2][red] += 1;
+            for(int i = 0; i < 3; i++) {
+                int index = bgr[i];
+
+                if (table[i][index] == NULL) {
+                    table[i][index] = (*hte)malloc(sizeof(hte));
+                    hte *p = table[i][index];
+
+                    p->frq = 0;
+                    p->l = NULL;
+                    p->r = NULL;
+                }
+
+                p->frq++;
+            }
+
 
             newData[c] = blue;
             newData[c + 1] = green;
@@ -152,9 +190,43 @@ int main(int argc, char** argv) {
     //Create result image memory
     BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
+    //Set up other variables
     int d = f(quality)
+    int size = 255 / d; //This represents the max value a pixel can be in the table
+    hte *table[3][256] = {NULL}; //Some space is unused, this is simpler
 
-    imageProcess(w, h, rwb, data, divisor, newData);
+    imageProcess(w, h, rwb, data, divisor, newData, table);
+    
+    int tableSize = {0, 0, 0}; //BGR
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < size + 1; j++) {
+            hte *p = table[i][j];
+            if(p != NULL)
+                tableSize[i]++;
+        }
+
+        pushNulls(table[i], size + 1); //Not very efficient, but it pushes them after counting
+    }
+
+    //Make the tree
+    for(int i = 0; i < 3; i++) {
+        while(table[i][1] != NULL) { //Loop breaks after there's only 1 left
+            qsort(table[i], tableSize[i], sizeof(hte), cmp_hte);
+
+            hte *comb = (*hte)malloc(sizeof(hte));
+            comb->l = table[i][0];
+            comb->r = table[i][1];
+            comb->frq = table[i][0]->frq + table[i][1]->frq;
+            comb->val = -1;
+
+            huff[i][0] = comb;
+            table[i][1] = NULL;
+
+            pushNulls(table[i], tableSize[i]);
+            tableSize[i]--;
+        } 
+ 
+    }
 
     //Return the modified image with a different title
     char output[sizeof(input) / sizeof(char)];
@@ -178,6 +250,8 @@ int main(int argc, char** argv) {
 
 
     //Conclude Program
+    for(int i = 0; i < 3; i++)
+        munmap(table[i], sizeof(hte) * size);
     munmap(data, fih.biSizeImage);
     munmap(newData, fih.biSizeImage);
     return 0;
