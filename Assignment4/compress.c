@@ -32,14 +32,14 @@ DWORD biClrUsed; //number of colors used by th ebitmap
 DWORD biClrImportant; //number of colors that are important
 } typedef BITMAPINFOHEADER;
 
-void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*);
-int f(int);
-int cmp_hte(hte*, hte*);
-
 struct hte {
     int frq, val;
-    hte *l, *r;
+    struct hte *l, *r;
 } typedef hte;
+
+void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
+int f(int);
+int cmp_hte(hte*, hte*);
 
 int cmp_hte(hte *a, hte *b) {
     int aFrq = a->frq;
@@ -62,24 +62,25 @@ void pushNulls(hte **arr, int n) {
     }
 }
 
-void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte** table) {
+void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte*** table) {
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             int c = x * 3 + y * rwb; // c for cursor
 
-            int* bgr = {-1, -1, -1};
+            int bgr[] = {-1, -1, -1};
             for(int i = 0; i < 3; i++)
                 bgr[i] = data[c + i] / divisor;
 
             //Store data in a table that has three arrays from [0, 255 / divisor]
             for(int i = 0; i < 3; i++) {
                 int index = bgr[i];
+                hte *p = table[i][index];
 
-                if (table[i][index] == NULL) {
-                    table[i][index] = (*hte)malloc(sizeof(hte));
-                    hte *p = table[i][index];
+                if (p == NULL) {
+                    table[i][index] = (hte*)malloc(sizeof(hte));
+                    p = table[i][index];
 
                     p->frq = 0;
                     p->l = NULL;
@@ -90,9 +91,9 @@ void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newDat
             }
 
 
-            newData[c] = blue;
-            newData[c + 1] = green;
-            newData[c + 2] = red;
+            newData[c] = bgr[0];
+            newData[c + 1] = bgr[1];
+            newData[c + 2] = bgr[2];
         }
     }
 }
@@ -129,7 +130,7 @@ int f(int Quality) {
             d = 2;
             break;
         case 10:
-            d = 1
+            d = 1;
             break;
         default:
             printf("Invalid quality value. Please enter a number from 1 to 10.\n");
@@ -191,13 +192,20 @@ int main(int argc, char** argv) {
     BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
     //Set up other variables
-    int d = f(quality)
+    int d = f(quality);
     int size = 255 / d; //This represents the max value a pixel can be in the table
-    hte *table[3][256] = {NULL}; //Some space is unused, this is simpler
-
-    imageProcess(w, h, rwb, data, divisor, newData, table);
     
-    int tableSize = {0, 0, 0}; //BGR
+    
+    hte **table[3]; //Some space is unused, this is simpler
+    for(int i = 0; i < 3; i++) {
+        table[i] = (hte**)mmap(NULL, sizeof(hte) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        for(int j = 0; j < size + 1; j++)
+            table[i][j] = NULL;
+    }
+
+    imageProcess(w, h, rwb, data, d, newData, table);
+    
+    int tableSize[] = {0, 0, 0}; //BGR
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < size + 1; j++) {
             hte *p = table[i][j];
@@ -211,15 +219,15 @@ int main(int argc, char** argv) {
     //Make the tree
     for(int i = 0; i < 3; i++) {
         while(table[i][1] != NULL) { //Loop breaks after there's only 1 left
-            qsort(table[i], tableSize[i], sizeof(hte), cmp_hte);
+            qsort(table[i], tableSize[i], sizeof(hte*), cmp_hte);
 
-            hte *comb = (*hte)malloc(sizeof(hte));
+            hte *comb = (hte*)malloc(sizeof(hte));
             comb->l = table[i][0];
             comb->r = table[i][1];
             comb->frq = table[i][0]->frq + table[i][1]->frq;
             comb->val = -1;
 
-            huff[i][0] = comb;
+            table[i][0] = comb;
             table[i][1] = NULL;
 
             pushNulls(table[i], tableSize[i]);
