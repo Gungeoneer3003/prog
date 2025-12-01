@@ -37,9 +37,47 @@ struct hte {
     struct hte *l, *r;
 } typedef hte;
 
+typedef struct {
+    BYTE* data;
+    int bitp, size, capacity;
+} bitarr;
+
 void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
 int f(int);
 int cmp_hte(hte*, hte*);
+
+// Initialize a dynamic array
+void initDynamicArray(DynamicArray *arr, size_t initialCapacity) {
+    arr->data = (int*)malloc(initialCapacity * sizeof(int));
+    if (arr->data == NULL) {
+        perror("Failed to allocate memory");
+        exit(EXIT_FAILURE);
+    }
+    arr->size = 0;
+    arr->capacity = initialCapacity;
+}
+
+// Add an element to the dynamic array
+void addElement(DynamicArray *arr, int value) {
+    if (arr->size == arr->capacity) {
+        arr->capacity *= 2; // Double the capacity
+        arr->data = (int *)realloc(arr->data, arr->capacity * sizeof(int));
+        if (arr->data == NULL) {
+            perror("Failed to reallocate memory");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    arr->data[arr->size++] = value;
+}
+
+// Free the memory allocated for the dynamic array
+void freeDynamicArray(DynamicArray *arr) {
+    free(arr->data);
+    arr->data = NULL;
+    arr->size = 0;
+    arr->capacity = 0;
+}
 
 int cmp_hte(hte *a, hte *b) {
     int aFrq = a->frq;
@@ -61,6 +99,49 @@ void pushNulls(hte **arr, int n) {
         arr[write++] = NULL;
     }
 }
+
+void putbit(bitarr *x, BYTE bit) {
+    int i = x->bitp / 8;
+    int actual_bitp = bitp - i * 8;
+
+    int shiftamount = 8 - 1 - actual_bitp;
+    bit <<= shiftamount;
+
+    if(x->data == NULL) {
+        int initialCapacity = 4;
+
+        x->data = (int*)malloc(initialCapacity * sizeof(int));
+        x->size = 0;
+        x->capacity = initialCapacity;
+    }
+    else if (x->size == x->capacity) {
+        x->capacity *= 2; //Double it
+        x->data = (int*)realloc(x->data, x->capacity * sizeof(int));
+    }
+
+    x->data[i] =| bit;
+    x->size++;
+    x->bitp++;
+}
+
+
+void putbitpattern(BYTE* bits, int bitsize) {
+    for(int u = 0; u < bitsize / 8; u++) {
+        int mom_bits = bitsize - u * 8;
+        if (mom_bits > 8)
+            mom_bits = 8;
+
+        for(int i = 0; i < 8 && i < mom_bits; i++) {
+            BYTE workon = bits[u];
+
+            workon <<= i;
+            workon >>= 7;
+
+            putbit(workon);
+        }
+    }
+}
+
 
 void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte*** table) {
     for (int x = 0; x < w; x++)
