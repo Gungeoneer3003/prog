@@ -9,6 +9,7 @@ typedef unsigned char BYTE;
 typedef unsigned short WORD;
 typedef unsigned int DWORD;
 typedef unsigned int LONG;
+//Image file structs
 struct tagBITMAPFILEHEADER
 {
 WORD bfType; //specifies the file type
@@ -32,53 +33,36 @@ DWORD biClrUsed; //number of colors used by th ebitmap
 DWORD biClrImportant; //number of colors that are important
 } typedef BITMAPINFOHEADER;
 
+//Supporting structs
 struct hte {
     int frq, val;
     struct hte *l, *r;
 } typedef hte;
 
 typedef struct {
+    int size;
     BYTE* data;
-    int bitp, size, capacity;
+    int bitp, capacity;
 } bitarr;
 
+typedef struct {
+    BYTE data[200]; //Currently unknown if a smaller digit is more practical
+    int digit; 
+} bitpattern;
+
+
+//Prototypes
 void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
 int f(int);
 int cmp_hte(hte*, hte*);
-
-// Initialize a dynamic array
-void initDynamicArray(DynamicArray *arr, size_t initialCapacity) {
-    arr->data = (int*)malloc(initialCapacity * sizeof(int));
-    if (arr->data == NULL) {
-        perror("Failed to allocate memory");
-        exit(EXIT_FAILURE);
-    }
-    arr->size = 0;
-    arr->capacity = initialCapacity;
-}
-
-// Add an element to the dynamic array
-void addElement(DynamicArray *arr, int value) {
-    if (arr->size == arr->capacity) {
-        arr->capacity *= 2; // Double the capacity
-        arr->data = (int *)realloc(arr->data, arr->capacity * sizeof(int));
-        if (arr->data == NULL) {
-            perror("Failed to reallocate memory");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    arr->data[arr->size++] = value;
-}
+void pushNulls(hte **arr, int n);
+void putbit(bitarr *x, BYTE bit);
+void getbit(bitarr *x);
+void putbitpattern(bitarr *x, bitpattern *source);
+void writebit(bitpattern *d, BYTE bit);
+int size(hte* node);
 
 // Free the memory allocated for the dynamic array
-void freeDynamicArray(DynamicArray *arr) {
-    free(arr->data);
-    arr->data = NULL;
-    arr->size = 0;
-    arr->capacity = 0;
-}
-
 int cmp_hte(hte *a, hte *b) {
     int aFrq = a->frq;
     int bFrq = b->frq;
@@ -101,49 +85,76 @@ void pushNulls(hte **arr, int n) {
 }
 
 void putbit(bitarr *x, BYTE bit) {
-    int i = x->bitp / 8;
-    int actual_bitp = bitp - i * 8;
+    int byteIndex = x->bitp / 8;
+    int bitIndex = x->bitp % 8;
 
-    int shiftamount = 8 - 1 - actual_bitp;
-    bit <<= shiftamount;
-
-    if(x->data == NULL) {
-        int initialCapacity = 4;
-
-        x->data = (int*)malloc(initialCapacity * sizeof(int));
+    //Need code for resizing
+    if (x->data == NULL) {
+        x->capacity = 4;
+        x->data = (BYTE*)calloc(x->capacity, 1);
         x->size = 0;
-        x->capacity = initialCapacity;
-    }
-    else if (x->size == x->capacity) {
-        x->capacity *= 2; //Double it
-        x->data = (int*)realloc(x->data, x->capacity * sizeof(int));
-    }
+    } 
+    else if (byteIndex >= x->capacity) {
+        while(byteIndex >= x->capacity)
+            x->capacity *= 2; //Double it
 
-    x->data[i] =| bit;
-    x->size++;
+        x->data = (int*)realloc(x->data, x->capacity * sizeof(int));
+        memset(x->data + x->size, 0, x->capacity - x->size);
+    }
+ 
+    x->data[byteIndex] |= (bit << (7 - bitIndex));
+    
+    if (byteIndex >= x->size)
+        x->size = byteIndex + 1;
     x->bitp++;
 }
 
+void getbit(bitarr *x) {
+    int i = x->bitp / 8;
+    int actual_bitp = x->bitp - i * 8;
 
-void putbitpattern(BYTE* bits, int bitsize) {
+    BYTE bit = 1;
+    int shiftamount = 8 - 1 - actual_bitp;
+    bit <<= shiftamount;
+
+    BYTE targetbit = data[i] & bit;
+    x->bitp++;
+
+    if (targetbit == 0) return 0;
+    else return 1;
+}
+
+
+
+/*
+
+NEED TO FIX PUTBITPATTERN
+
+*/
+
+
+void putbitpattern(bitarr *x, bitpattern *source) {
     for(int u = 0; u < bitsize / 8; u++) {
         int mom_bits = bitsize - u * 8;
         if (mom_bits > 8)
             mom_bits = 8;
-
+        
         for(int i = 0; i < 8 && i < mom_bits; i++) {
             BYTE workon = bits[u];
 
             workon <<= i;
             workon >>= 7;
 
-            putbit(workon);
+            putbit(x, workon);
         }
     }
 }
 
+void writebit(bitpattern *d, BYTE bit) {
+    d->data[d->digit++] = bit;
+}
 
-void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte*** table) {
+void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newData, hte** treeTable[]) {
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
@@ -157,13 +168,14 @@ void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newDat
             //Store data in a table that has three arrays from [0, 255 / divisor]
             for(int i = 0; i < 3; i++) {
                 int index = bgr[i];
-                hte *p = table[i][index];
+                hte *p = treeTable[i][index];
 
                 if (p == NULL) {
-                    table[i][index] = (hte*)malloc(sizeof(hte));
-                    p = table[i][index];
+                    treeTable[i][index] = (hte*)malloc(sizeof(hte));
+                    p = treeTable[i][index];
 
                     p->frq = 0;
+                    p->val = index;
                     p->l = NULL;
                     p->r = NULL;
                 }
@@ -221,6 +233,31 @@ int f(int Quality) {
     return d;
 }
 
+int size(hte* node) {
+    if (node == NULL):
+        return 0;
+    return 1 + size(node.l) + size(node.r)
+}
+
+void determinePath(hte** tree, )
+
+//Table of contents of main:
+/*
+1. Read in inputs
+2. Read in file
+3. Create supporting image file variables
+4. Allocate hte array for the tree
+5. Process Image
+6. Determine size of each tree and push nulls to the bottom
+7. Create each tree, then determine paths for each val
+8. Create bitarrs, and fill each one with the new compressed data
+9. Create a file to store the compressed image
+10. Store supporting image file variables
+11. Store each tree, each bitarr, and relevant info for each
+12. Close the file
+13. Deallocate all used memory (arrays, trees, and bitarrs)
+*/
+
 int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
     // if (argc < 2) {
@@ -277,54 +314,89 @@ int main(int argc, char** argv) {
     int size = 255 / d; //This represents the max value a pixel can be in the table
     
     
-    hte **table[3]; //Some space is unused, this is simpler
+    hte **treeTable[3]; //Some space is unused, this is simpler
     for(int i = 0; i < 3; i++) {
-        table[i] = (hte**)mmap(NULL, sizeof(hte) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        treeTable[i] = (hte**)mmap(NULL, sizeof(hte) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         for(int j = 0; j < size + 1; j++)
-            table[i][j] = NULL;
+            treeTable[i][j] = NULL;
     }
 
-    imageProcess(w, h, rwb, data, d, newData, table);
+    imageProcess(w, h, rwb, data, d, newData, treeTable);
     
     int tableSize[] = {0, 0, 0}; //BGR
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < size + 1; j++) {
-            hte *p = table[i][j];
+            hte *p = treeTable[i][j];
             if(p != NULL)
                 tableSize[i]++;
         }
 
-        pushNulls(table[i], size + 1); //Not very efficient, but it pushes them after counting
-    }
+        pushNulls(treeTable[i], size + 1); //Not very efficient, but it pushes them after counting
+    }     
 
-    //Make the tree
+    //Make the trees and figure out size
+    int treeSize[] = {0, 0, 0};
+    bitpattern** codeTable;
     for(int i = 0; i < 3; i++) {
-        while(table[i][1] != NULL) { //Loop breaks after there's only 1 left
-            qsort(table[i], tableSize[i], sizeof(hte*), cmp_hte);
+        int val = tableSize[i];
+
+        while(treeTable[i][1] != NULL) { //Loop breaks after there's only 1 left
+            qsort(treeTable[i], tableSize[i], sizeof(hte*), cmp_hte);
 
             hte *comb = (hte*)malloc(sizeof(hte));
-            comb->l = table[i][0];
-            comb->r = table[i][1];
-            comb->frq = table[i][0]->frq + table[i][1]->frq;
+            comb->l = treeTable[i][0];
+            comb->r = treeTable[i][1];
+            comb->frq = treeTable[i][0]->frq + treeTable[i][1]->frq;
             comb->val = -1;
 
-            table[i][0] = comb;
-            table[i][1] = NULL;
+            treeTable[i][0] = comb;
+            treeTable[i][1] = NULL;
 
-            pushNulls(table[i], tableSize[i]);
+            pushNulls(treeTable[i], tableSize[i]);
             tableSize[i]--;
         } 
- 
+
+        tableSize[i] = val; //Restore it for later
+        treeSize[i] = size(treeTable[i][0]);
+
+        //Now that the tree is done, make the path table
+        codeTable[i] = (bitpattern*)mmap(NULL, sizeof(bitpattern*) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        determinePath(treeTable[i], codeTable[i]);
     }
+
+    //Create bitarrs and fill them
+    bitpattern* tempPath;
+    bitarr* arr[3];
+    for(int u = 0; u < 3; u++) { //u for current color
+        for (int x = 0; x < w; x++)
+        {
+            for (int y = 0; y < h; y++)
+            {
+                int c = x * 3 + y * rwb; // c for cursor
+                int val = newData[c + u]; 
+                
+                tempPath = codeTable[val];
+                putbitpattern(arr[u], tempPath);
+            }
+        }
+    }
+
+    //File Storage
+    /*
+    1. All normal image variables
+    2. Size of a code table, then the table
+    3. Size of a bitarr, then the bitarr for one color
+    4. (Part 2 and 3 for the other two colors)
+    */
 
     //Return the modified image with a different title
     char output[sizeof(input) / sizeof(char)];
     strncpy(output, input, sizeof(input) - 4);
     output[sizeof(output) / sizeof(char) - 1] = '\0';
 
-
     FILE* lastFile = fopen(output, "wb");
     
+    //Part 1
     fwrite(&fh.bfType, 2, 1, lastFile);
     fwrite(&fh.bfSize, 4, 1, lastFile);
     fwrite(&fh.bfReserved1, 2, 1, lastFile);
@@ -333,14 +405,25 @@ int main(int argc, char** argv) {
 
     fwrite(&fih, sizeof(fih), 1, lastFile);
 
-    fwrite(newData, fih.biSizeImage, 1, lastFile);
-
+    //Part 2-4
+    for(int i = 0; i < 3; i++) {
+        //Write the tree in 
+        fwrite(&treeSize[i], sizeof(treeSize[i]), 1, lastFile);
+        fwriteTree(treeTable[i], lastFile); //Recursive function
+        
+        fwrite(&arr[i]->size, sizeof(arr[i]->size), 1, lastFile);
+        fwrite(&arr[i]->data, arr[i]->size, 1, lastFile);
+        fwrite(&arr[i]->bitp, sizeof(arr[i]->bitp), 1, lastFile);
+        fwrite(&arr[i]->capacity, sizeof(arr[i]->capacity), 1, lastFile);
+    }
     fclose(lastFile);
 
 
     //Conclude Program
-    for(int i = 0; i < 3; i++)
-        munmap(table[i], sizeof(hte) * size);
+    for(int i = 0; i < 3; i++) {
+        munmap(codeTable[i], sizeof(bitpattern) * (size + 1));
+        freeTree(treeTable[i]);
+    }
     munmap(data, fih.biSizeImage);
     munmap(newData, fih.biSizeImage);
     return 0;
