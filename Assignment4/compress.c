@@ -57,7 +57,7 @@ int f(int);
 int cmp_hte(hte*, hte*);
 void pushNulls(hte **arr, int n);
 void putbit(bitarr *x, BYTE bit);
-void getbit(bitarr *x);
+int getbit(bitarr *x);
 void putbitpattern(bitarr *x, bitpattern *source);
 void writebit(bitpattern *d, BYTE bit);
 int size(hte* node);
@@ -98,7 +98,7 @@ void putbit(bitarr *x, BYTE bit) {
         while(byteIndex >= x->capacity)
             x->capacity *= 2; //Double it
 
-        x->data = (int*)realloc(x->data, x->capacity * sizeof(int));
+        x->data = (BYTE*)realloc(x->data, x->capacity * sizeof(BYTE));
         memset(x->data + x->size, 0, x->capacity - x->size);
     }
  
@@ -109,7 +109,7 @@ void putbit(bitarr *x, BYTE bit) {
     x->bitp++;
 }
 
-void getbit(bitarr *x) {
+int getbit(bitarr *x) {
     int i = x->bitp / 8;
     int actual_bitp = x->bitp - i * 8;
 
@@ -214,9 +214,9 @@ int f(int Quality) {
 }
 
 int size(hte* node) {
-    if (node == NULL):
+    if (node == NULL)
         return 0;
-    return 1 + size(node.l) + size(node.r)
+    return 1 + size(node->l) + size(node->r);
 }
 
 void determinePath(hte* tree, bitpattern* table, BYTE* path, int i) {
@@ -252,6 +252,22 @@ void fwriteTree(hte* tree, FILE* f) {
     fwrite(tree, sizeof(hte) - 2*sizeof(hte*), 1, f); // write data only
     fwriteTree(tree->l, f);
     fwriteTree(tree->r, f);
+}
+
+void freeTree(hte *treeTable) {
+    for(int i = 0; i < 256; i++) {
+        hte *node = treeTable[i];
+        freeNode(node);
+    }
+    munmap(treeTable, sizeof(hte) * 256);
+}
+
+void freeNode(hte *node) {
+    if (node == NULL)
+        return;
+    freeNode(node->l);
+    freeNode(node->r);
+    free(node);
 }
 
 //Table of contents of main:
@@ -349,7 +365,7 @@ int main(int argc, char** argv) {
 
     //Make the trees and figure out size
     int treeSize[] = {0, 0, 0};
-    bitpattern** codeTable;
+    bitpattern* codeTable[3];
     for(int i = 0; i < 3; i++) {
         int val = tableSize[i];
 

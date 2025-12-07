@@ -57,7 +57,7 @@ int f(int);
 int cmp_hte(hte*, hte*);
 void pushNulls(hte **arr, int n);
 void putbit(bitarr* x, BYTE bit);
-void getbit(bitarr x);
+int getbit(bitarr* x);
 void putbitpattern(bitarr* x, bitpattern source);
 void writebit(bitpattern *d, BYTE bit);
 int size(hte* node);
@@ -109,8 +109,8 @@ void putbit(bitarr *x, BYTE bit) {
     x->bitp++;
 }
 
-int getbit(bitarr x) {
-    int i = x.bitp / 8;
+int getbit(bitarr* x) {
+    int i = x->bitp / 8;
     int actual_bitp = x.bitp - i * 8;
 
     BYTE bit = 1;
@@ -118,7 +118,7 @@ int getbit(bitarr x) {
     bit <<= shiftamount;
 
     BYTE targetbit = x.data[i] & bit;
-    x.bitp++;
+    x->bitp++;
 
     if (targetbit == 0) return 0;
     else return 1;
@@ -241,7 +241,7 @@ void determinePath(hte* tree, bitpattern* table, BYTE* path, int i) {
     }
 }
 
-void freeTree(hte **treeTable) {
+void freeTree(hte *treeTable) {
     for(int i = 0; i < 256; i++) {
         hte *node = treeTable[i];
         freeNode(node);
@@ -290,7 +290,7 @@ BYTE determineByte(bitarr* arr, hte* tree) {
     if(tree->l == NULL && tree->r == NULL) 
         return tree->val;
     
-    if(getbit(arr))
+    if(getbit(arr) == 0)
         return determineByte(arr, tree->l);
     else
         return determineByte(arr, tree->r);
@@ -343,11 +343,11 @@ int main(int argc, char** argv) {
         fread(&treeSize[i], sizeof(treeSize[i]), 1, f1); 
         treeTable[i] = freadTree(f1);
 
-        fread(&arr[i].size, sizeof(arr[i].size), 1, f1);
+        fread(arr[i].size, sizeof(arr[i].size), 1, f1);
         arr[i].data = (BYTE*)mmap(NULL, arr[i].size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-        fread(&arr[i].data, arr[i].size, 1, f1);
-        fwrite(&arr[i].bitp, sizeof(arr[i].bitp), 1, f1);
-        fwrite(&arr[i].capacity, sizeof(arr[i].capacity), 1, f1);
+        fread(arr[i].data, arr[i].size, 1, f1);
+        fread(arr[i].bitp, sizeof(arr[i].bitp), 1, f1);
+        fread(arr[i].capacity, sizeof(arr[i].capacity), 1, f1);
 
         arr[i].bitp = 0;
     }
@@ -375,9 +375,9 @@ int main(int argc, char** argv) {
         {
             int c = x * 3 + y * rwb; // c for cursor
             
-            newData[c] = determineByte(arr[0], treeTable[0]);
-            newData[c + 1] = determineByte(arr[1], treeTable[1]);
-            newData[c + 2] = determineByte(arr[2], treeTable[2]);
+            newData[c] = determineByte(arr[0], treeTable[0]) * d;
+            newData[c + 1] = determineByte(arr[1], treeTable[1]) * d;
+            newData[c + 2] = determineByte(arr[2], treeTable[2]) * d;
         }
     }
 
@@ -395,10 +395,10 @@ int main(int argc, char** argv) {
 
     fwrite(&fih, sizeof(fih), 1, lastFile);
 
+    fwrite(newData, fih.biSizeImage, 1, lastFile);
+    fclose(lastFile);
+
     //Conclude Program
-    for(int i = 0; i < 3; i++) 
-        munmap(codeTable[i], sizeof(bitpattern) * (size + 1));
-    munmap(data, fih.biSizeImage);
     munmap(newData, fih.biSizeImage);
     return 0;
 }
