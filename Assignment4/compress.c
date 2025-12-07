@@ -124,29 +124,9 @@ void getbit(bitarr *x) {
     else return 1;
 }
 
-
-
-/*
-
-NEED TO FIX PUTBITPATTERN
-
-*/
-
-
 void putbitpattern(bitarr *x, bitpattern *source) {
-    for(int u = 0; u < bitsize / 8; u++) {
-        int mom_bits = bitsize - u * 8;
-        if (mom_bits > 8)
-            mom_bits = 8;
-        
-        for(int i = 0; i < 8 && i < mom_bits; i++) {
-            BYTE workon = bits[u];
-
-            workon <<= i;
-            workon >>= 7;
-
-            putbit(x, workon);
-        }
+    for(int u = 0; u < bitpat->digit; u++) {
+        putbit(x, source->data[u]);
     }
 }
 
@@ -239,7 +219,27 @@ int size(hte* node) {
     return 1 + size(node.l) + size(node.r)
 }
 
-void determinePath(hte** tree, )
+void determinePath(hte* tree, bitpattern* table, BYTE* path, int i) {
+    if(tree->l != NULL && tree->r != NULL) {
+        path[i++] = 0;
+        determinePath(tree->l, path, i);
+        i--;
+    }
+    if else (tree->r != NULL) {
+        path[i++] = 1;
+        determinePath(tree->r, path, i);
+        i--;
+    }
+    else 
+        putPath(table[tree->val], path, i);
+}
+
+void putPath(bitpattern* entry, BYTE* path, int size) {
+    for(int i = 0; i < size; i++) {
+        entry->data[i] = path[i];
+        entry->digit++;
+    }     
+}  
 
 //Table of contents of main:
 /*
@@ -361,7 +361,8 @@ int main(int argc, char** argv) {
 
         //Now that the tree is done, make the path table
         codeTable[i] = (bitpattern*)mmap(NULL, sizeof(bitpattern*) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-        determinePath(treeTable[i], codeTable[i]);
+        BYTE path[200];
+        determinePath(treeTable[i][0], codeTable[i], path, 0);
     }
 
     //Create bitarrs and fill them
