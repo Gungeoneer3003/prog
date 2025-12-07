@@ -56,9 +56,9 @@ void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
 int f(int);
 int cmp_hte(hte*, hte*);
 void pushNulls(hte **arr, int n);
-void putbit(bitarr* x, BYTE bit);
-void getbit(bitarr x);
-void putbitpattern(bitarr* x, bitpattern source);
+void putbit(bitarr *x, BYTE bit);
+void getbit(bitarr *x);
+void putbitpattern(bitarr *x, bitpattern *source);
 void writebit(bitpattern *d, BYTE bit);
 int size(hte* node);
 
@@ -98,7 +98,7 @@ void putbit(bitarr *x, BYTE bit) {
         while(byteIndex >= x->capacity)
             x->capacity *= 2; //Double it
 
-        x->data = (BYTE*)realloc(x->data, x->capacity * sizeof(int));
+        x->data = (int*)realloc(x->data, x->capacity * sizeof(int));
         memset(x->data + x->size, 0, x->capacity - x->size);
     }
  
@@ -109,24 +109,24 @@ void putbit(bitarr *x, BYTE bit) {
     x->bitp++;
 }
 
-void getbit(bitarr x) {
-    int i = x.bitp / 8;
-    int actual_bitp = x.bitp - i * 8;
+void getbit(bitarr *x) {
+    int i = x->bitp / 8;
+    int actual_bitp = x->bitp - i * 8;
 
     BYTE bit = 1;
     int shiftamount = 8 - 1 - actual_bitp;
     bit <<= shiftamount;
 
-    BYTE targetbit = x.data[i] & bit;
-    x.bitp++;
+    BYTE targetbit = data[i] & bit;
+    x->bitp++;
 
     if (targetbit == 0) return 0;
     else return 1;
 }
 
-void putbitpattern(bitarr* x, bitpattern source) {
-    for(int u = 0; u < source.digit; u++) {
-        putbit(x, source.data[u]);
+void putbitpattern(bitarr *x, bitpattern *source) {
+    for(int u = 0; u < bitpat->digit; u++) {
+        putbit(x, source->data[u]);
     }
 }
 
@@ -213,56 +213,45 @@ int f(int Quality) {
     return d;
 }
 
-int sizeTree(hte* node) {
-    if (node == NULL)
+int size(hte* node) {
+    if (node == NULL):
         return 0;
-    return 1 + sizeTree(node->l) + sizeTree(node->r);
+    return 1 + size(node.l) + size(node.r)
 }
 
 void determinePath(hte* tree, bitpattern* table, BYTE* path, int i) {
     if(tree->l != NULL && tree->r != NULL) {
         path[i++] = 0;
-        determinePath(tree->l, table, path, i);
+        determinePath(tree->l, path, i);
         i--;
     }
-    else if (tree->r != NULL) {
+    if else (tree->r != NULL) {
         path[i++] = 1;
-        determinePath(tree->r, table, path, i);
+        determinePath(tree->r, path, i);
         i--;
     }
-    else {
-        table[tree->val].digit = 0;
-        int size = i;
-
-        for(int i = 0; i < size; i++) {
-            table[tree->val].data[i] = path[i];
-            table[tree->val].digit++;
-        }
-    }
+    else 
+        putPath(table[tree->val], path, i);
 }
 
-void freeTree(hte **treeTable) {
-    for(int i = 0; i < 256; i++) {
-        hte *node = treeTable[i];
-        freeNode(node);
-    }
-    munmap(treeTable, sizeof(hte) * 256);
-}
+void putPath(bitpattern* entry, BYTE* path, int size) {
+    for(int i = 0; i < size; i++) {
+        entry->data[i] = path[i];
+        entry->digit++;
+    }     
+}  
 
-void freeNode(hte *node) {
-    if (node == NULL)
+void fwriteTree(hte* tree, FILE* f) {
+    if (tree == NULL) {
+        int flag = 0;
+        fwrite(&flag, sizeof(int), 1, f);
         return;
-    freeNode(node->l);
-    freeNode(node->r);
-    free(node);
-}
-
-void fwriteTree(hte *tree, FILE *file) {
-    if (tree != NULL) {
-        fwrite(tree, sizeof(hte), 1, file);
-        fwriteTree(tree->l, file);
-        fwriteTree(tree->r, file);
     }
+    int flag = 1;
+    fwrite(&flag, sizeof(int), 1, f);
+    fwrite(tree, sizeof(hte) - 2*sizeof(hte*), 1, f); // write data only
+    fwriteTree(tree->l, f);
+    fwriteTree(tree->r, f);
 }
 
 //Table of contents of main:
@@ -340,7 +329,7 @@ int main(int argc, char** argv) {
     
     hte **treeTable[3]; //Some space is unused, this is simpler
     for(int i = 0; i < 3; i++) {
-        treeTable[i] = (hte*)mmap(NULL, sizeof(hte) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        treeTable[i] = (hte**)mmap(NULL, sizeof(hte) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         for(int j = 0; j < size + 1; j++)
             treeTable[i][j] = NULL;
     }
@@ -360,7 +349,7 @@ int main(int argc, char** argv) {
 
     //Make the trees and figure out size
     int treeSize[] = {0, 0, 0};
-    bitpattern* codeTable[3];
+    bitpattern** codeTable;
     for(int i = 0; i < 3; i++) {
         int val = tableSize[i];
 
@@ -381,17 +370,17 @@ int main(int argc, char** argv) {
         } 
 
         tableSize[i] = val; //Restore it for later
-        treeSize[i] = sizeTree(treeTable[i][0]);
+        treeSize[i] = size(treeTable[i][0]);
 
         //Now that the tree is done, make the path table
-        codeTable[i] = (bitpattern*)mmap(NULL, sizeof(bitpattern) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        codeTable[i] = (bitpattern*)mmap(NULL, sizeof(bitpattern*) * (size + 1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         BYTE path[200];
         determinePath(treeTable[i][0], codeTable[i], path, 0);
     }
 
     //Create bitarrs and fill them
-    bitpattern tempPath;
-    bitarr arr[3];
+    bitpattern* tempPath;
+    bitarr* arr[3];
     for(int u = 0; u < 3; u++) { //u for current color
         for (int x = 0; x < w; x++)
         {
@@ -400,8 +389,8 @@ int main(int argc, char** argv) {
                 int c = x * 3 + y * rwb; // c for cursor
                 int val = newData[c + u]; 
                 
-                tempPath = codeTable[u][val];
-                putbitpattern(&(arr[u]), tempPath);
+                tempPath = codeTable[val];
+                putbitpattern(arr[u], tempPath);
             }
         }
     }
@@ -434,12 +423,12 @@ int main(int argc, char** argv) {
     for(int i = 0; i < 3; i++) {
         //Write the tree in 
         fwrite(&treeSize[i], sizeof(treeSize[i]), 1, lastFile);
-        fwriteTree(treeTable[i][0], lastFile); //Recursive function
+        fwriteTree(treeTable[i], lastFile); //Recursive function
         
-        fwrite(&arr[i].size, sizeof(arr[i].size), 1, lastFile);
-        fwrite(&arr[i].data, arr[i].size, 1, lastFile);
-        fwrite(&arr[i].bitp, sizeof(arr[i].bitp), 1, lastFile);
-        fwrite(&arr[i].capacity, sizeof(arr[i].capacity), 1, lastFile);
+        fwrite(&arr[i]->size, sizeof(arr[i]->size), 1, lastFile);
+        fwrite(&arr[i]->data, arr[i]->size, 1, lastFile);
+        fwrite(&arr[i]->bitp, sizeof(arr[i]->bitp), 1, lastFile);
+        fwrite(&arr[i]->capacity, sizeof(arr[i]->capacity), 1, lastFile);
     }
     fclose(lastFile);
 
