@@ -490,7 +490,11 @@ int main(int argc, char** argv) {
     */
 
     //Return the modified image with a different title
-    char* output = "lion"; 
+    size_t len = strlen(input);
+
+    char output[256];      // or dynamically allocate
+    memcpy(output, input, len - 4);
+    output[len - 4] = '\0';
 
     FILE* lastFile = fopen(output, "wb");
     
@@ -503,10 +507,10 @@ int main(int argc, char** argv) {
 
     fwrite(&fih, sizeof(fih), 1, lastFile);
 
+    fwrite(&quality, sizeof(int), 1, lastFile);
     //Part 2-4
     for(int i = 0; i < 3; i++) {
         //Write the tree in 
-        fwrite(&treeSize[i], sizeof(treeSize[i]), 1, lastFile);
         fwriteTree(treeTable[i][0], lastFile); //Recursive function
         
         fwrite(&arr[i]->size, sizeof(arr[i]->size), 1, lastFile);
