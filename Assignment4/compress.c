@@ -217,7 +217,6 @@ int QualityToDivisor(int Quality) {
             printf("Invalid quality value. Please enter a number from 1 to 10.\n");
     }
 
-
     return d;
 }
 

@@ -120,6 +120,8 @@ int QualityToDivisor(int Quality) {
         default:
             printf("Invalid quality value. Please enter a number from 1 to 10.\n");
     }
+
+    return d;
 }
 
 hte* freadTree(FILE* f) {
