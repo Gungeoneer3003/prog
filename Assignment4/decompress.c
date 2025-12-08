@@ -154,15 +154,16 @@ void freeNode(hte *node) {
 
 int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
-    // if (argc < 2) {
-    //     printf("Insufficient arguments, try again.\n");
-    //     printf("Usage: ./decompress input.cwa output.bmp\n");
-    //     return 0;
-    // }
+    if (argc < 2) {
+        printf("Insufficient arguments, try again.\n");
+        printf("Usage: ./decompress input.cwa output.bmp\n");
+        return 0;
+    }
     char* input = argv[1];
+    char* output = argv[2];
     
     //Hard-coded Inputs
-    char *input = "lion.cwa"; 
+    //char *input = "lion.cwa"; 
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
@@ -232,7 +233,6 @@ int main(int argc, char** argv) {
     }
 
     //Create file
-    char* output = argv[1];
     FILE* lastFile = fopen(output, "wb");
     
     fwrite(&fh.bfType, 2, 1, lastFile);

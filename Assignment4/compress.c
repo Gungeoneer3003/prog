@@ -313,17 +313,17 @@ void fwriteTree(hte* tree, FILE* f) {
 
 int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
-    // if (argc < 2) {
-    //     printf("Insufficient arguments, try again.\n");
-    //     printf("Usage: ./a2 input.bmp ratio processors output.bmp\n");
-    //     return 0;
-    // }
-    // char* input = argv[1];
-    // int quality = atoi(argv[2]);
+    if (argc < 2) {
+        printf("Insufficient arguments, try again.\n");
+        printf("Usage: ./a2 input.bmp ratio processors output.bmp\n");
+        return 0;
+    }
+    char* input = argv[1];
+    int quality = atoi(argv[2]);
 
     //Hard coded inputs
-    char *input = "lion.bmp";
-    int quality = 1;
+    // char *input = "lion.bmp";
+    // int quality = 1;
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
