@@ -65,8 +65,6 @@ void determinePath(hte* tree, bitpattern* table[], BYTE* path, int i);
 void freeTree(hte **treeTable, int count);
 void freeNode(hte *node);
 void fwriteTree(hte* tree, FILE* f);
-hte* freadTree(FILE* f);
-BYTE determineByte(bitarr* arr, hte* tree);
 
 int cmp_hte(const void *pa, const void *pb) {
     const hte *a = *(hte * const *)pa;
@@ -296,38 +294,6 @@ void fwriteTree(hte* tree, FILE* f) {
     fwriteTree(tree->r, f);
 }
 
-hte* freadTree(FILE* f) {
-    int flag;
-    if (fread(&flag, sizeof(int), 1, f) != 1)
-        return NULL;  // handle EOF / error
-
-    if (flag == 0)
-        return NULL;
-
-    hte* node = malloc(sizeof(hte));
-    if (!node) return NULL;
-
-    fread(&node->frq, sizeof(node->frq), 1, f);
-    fread(&node->val, sizeof(node->val), 1, f);
-
-    node->l = freadTree(f);
-    node->r = freadTree(f);
-    return node;
-}
-
-//This assumes no bad paths
-BYTE determineByte(bitarr* arr, hte* tree) {
-    if(tree->l == NULL && tree->r == NULL) 
-        return tree->val;
-    
-    if(getbit(arr) == 0)
-        return determineByte(arr, tree->l);
-    else
-        return determineByte(arr, tree->r);
-}
-
-
-
 //Table of contents of main:
 /*
 1. Read in inputs
@@ -491,9 +457,10 @@ int main(int argc, char** argv) {
     //Return the modified image with a different title
     size_t len = strlen(input);
 
-    char output[256];      // or dynamically allocate
+    char output[256];
     memcpy(output, input, len - 4);
-    output[len - 4] = '\0';
+    memcpy(output + (len - 4), ".cwa", 4);
+    output[len] = '\0';
 
     FILE* lastFile = fopen(output, "wb");
     

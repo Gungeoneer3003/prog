@@ -156,15 +156,13 @@ int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
     // if (argc < 2) {
     //     printf("Insufficient arguments, try again.\n");
-    //     printf("Usage: ./a2 input.bmp ratio processors output.bmp\n");
+    //     printf("Usage: ./decompress input.cwa output.bmp\n");
     //     return 0;
     // }
-    // char* input = argv[1];
-    // int quality = atoi(argv[2]);
+    char* input = argv[1];
     
     //Hard-coded Inputs
-    char *input = "lion"; 
-    //int quality = 10; //Decided to make it a part of the file
+    char *input = "lion.cwa"; 
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
@@ -234,7 +232,7 @@ int main(int argc, char** argv) {
     }
 
     //Create file
-    char* output = "lion2.bmp";
+    char* output = argv[1];
     FILE* lastFile = fopen(output, "wb");
     
     fwrite(&fh.bfType, 2, 1, lastFile);
