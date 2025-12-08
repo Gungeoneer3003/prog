@@ -490,9 +490,7 @@ int main(int argc, char** argv) {
     */
 
     //Return the modified image with a different title
-    char output[sizeof(input) / sizeof(char)];
-    strncpy(output, input, sizeof(input) - 4);
-    output[sizeof(output) / sizeof(char) - 1] = '\0';
+    char* output = "lion"; 
 
     FILE* lastFile = fopen(output, "wb");
     
