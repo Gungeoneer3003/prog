@@ -357,7 +357,7 @@ int main(int argc, char** argv) {
 
     //Hard coded inputs
     char *input = "lion.bmp";
-    int quality = 10;
+    int quality = 1;
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
