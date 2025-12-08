@@ -52,17 +52,22 @@ typedef struct {
 
 
 //Prototypes
-void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
-int f(int);
 int cmp_hte(hte*, hte*);
 void pushNulls(hte **arr, int n);
 void putbit(bitarr* x, BYTE bit);
 int getbit(bitarr* x);
 void putbitpattern(bitarr* x, bitpattern source);
 void writebit(bitpattern *d, BYTE bit);
-int size(hte* node);
+void imageProcess(LONG, LONG, int, BYTE*, int, BYTE*, hte***);
+int QualityToDivisor(int);
+int sizeTree(hte* node);
+void determinePath(hte* tree, bitpattern* table, BYTE* path, int i);
+void freeTree(hte *treeTable);
+void freeNode(hte *node);
+void fwriteTree(hte* tree, FILE* f);
+hte* freadTree(FILE* f);
+BYTE determineByte(bitarr* arr, hte* tree);
 
-// Free the memory allocated for the dynamic array
 int cmp_hte(hte *a, hte *b) {
     int aFrq = a->frq;
     int bFrq = b->frq;
@@ -171,7 +176,7 @@ void imageProcess(LONG w, LONG h, int rwb, BYTE* data, int divisor, BYTE* newDat
     }
 }
 
-int f(int Quality) {
+int QualityToDivisor(int Quality) {
     int d;
 
     switch (Quality) {
@@ -270,7 +275,6 @@ void fwriteTree(hte* tree, FILE* f) {
     fwriteTree(tree->r, f);
 }
 
-
 hte* freadTree(FILE* f) {
     int flag;
     fread(&flag, sizeof(int), 1, f);
@@ -332,7 +336,7 @@ int main(int argc, char** argv) {
     fread(&fih, sizeof(fih), 1, f1);
 
     //Set up other variables
-    int d = f(quality);
+    int d = QualityToDivisor(quality);
     int size = 255 / d; //This represents the max value a pixel can be in the table
 
 
