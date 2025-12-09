@@ -46,10 +46,13 @@ int compareColorBatch(const void *a, const void *b) {
     const colorBatch *ca = a;
     const colorBatch *cb = b;
 
-    if (ca->start != cb->start)
-        return (ca->start - cb->start);   // sort by start first
+    if (ca->start < cb->start) return -1;
+    if (ca->start > cb->start) return 1;
 
-    return (ca->line - cb->line);         // then by line
+    if (ca->line < cb->line) return -1;
+    if (ca->line > cb->line) return 1;
+
+    return 0;
 }
 
 int main(int argc, char** argv) {
@@ -101,9 +104,10 @@ int main(int argc, char** argv) {
             fread(&batchTable[i][j].end, sizeof(int), 1, f1);
             fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
             fread(&batchTable[i][j].line, sizeof(int), 1, f1);
-
-            qsort(batchTable[i], batchCount[i], sizeof(colorBatch), compareColorBatch);
+            
         }
+
+        qsort(batchTable[i], batchCount[i], sizeof(colorBatch), compareColorBatch);
     }
 
     fclose(f1);
