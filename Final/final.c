@@ -106,8 +106,12 @@ int main(int argc, char** argv) {
     fread(&batchCount[0], sizeof(int), 1, f1);
 
     colorBatch* batchTable[3];
+    colorBatch* validBatchTable[3]; //There's a lot of garbage in the file
+    int valid[] = {0, 0, 0};
+
     for(int i = 3-1; i >= 0; i++) { //Red, then green, then blue
         batchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        validBatchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
         for(int j = 0; j < batchCount[i]; j++) {
             fread(&batchTable[i][j].start, sizeof(int), 1, f1);
@@ -115,9 +119,22 @@ int main(int argc, char** argv) {
             fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
             fread(&batchTable[i][j].line, sizeof(int), 1, f1);
 
+            if(batchTable[i][j].line < 0 || batchTable[i][j].line >= h)
+                continue;
+            
+            if(batchTable[i][j].start < 0 || batchTable[i][j].start >= w)
+                continue;
+            
+            if(batchTable[i][j].end < 0 || batchTable[i][j].end >= w)
+                continue;
+            
+            if(batchTable[i][j].start > batchTable[i][j].end)
+                continue;
+
+            validBatchTable[i][valid[i]++] = batchTable[i][j]
         }
 
-        qsort(batchTable[i], batchCount[i], sizeof(colorBatch), compareColorBatch);
+        qsort(validBatchTable[i], valid[i], sizeof(colorBatch), compareColorBatch);
     }
 
     fclose(f1);
@@ -128,15 +145,8 @@ int main(int argc, char** argv) {
             int c = x * 3 + y * rwb; // c for cursor
             
             for(int i = 0; i < 3; i++) {
-                while (batchCursor[i] < batchCount[i]) {
-                    colorBatch current = batchTable[i][batchCursor[i]];
-
-                    //Invalid batches
-                    if(current.start >= w || current.start < 0 || current.line < 0 || current.line >= h) {
-                        batchCursor[i]++;
-                        continue;
-                    }
-
+                while (batchCursor[i] < valid[i]) {
+                    colorBatch current = validBatchTable[i][batchCursor[i]];
 
                     // Batch is fully before current scan position: advance
                     if (current.line < y || (current.line == y && current.end <= x && current.start <= x)) {
