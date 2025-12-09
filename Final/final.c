@@ -46,11 +46,11 @@ int compareColorBatch(const void *a, const void *b) {
     const colorBatch *ca = a;
     const colorBatch *cb = b;
 
-    if (ca->start < cb->start) return -1;
-    if (ca->start > cb->start) return 1;
-
     if (ca->line < cb->line) return -1;
     if (ca->line > cb->line) return 1;
+
+    if (ca->start < cb->start) return -1;
+    if (ca->start > cb->start) return 1;
 
     return 0;
 }
@@ -88,30 +88,6 @@ int main(int argc, char** argv) {
 
     fread(&fih, sizeof(fih), 1, f1);
 
-    BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-    int batchCount[3];
-    fread(&batchCount[2], sizeof(int), 1, f1); //red
-    fread(&batchCount[1], sizeof(int), 1, f1); //green
-    fread(&batchCount[0], sizeof(int), 1, f1);
-
-    colorBatch* batchTable[3];
-    for(int i = 0; i < 3; i++) {
-        batchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-        for(int j = batchCount[i]-1; j >= 0; j--) {
-            fread(&batchTable[i][j].start, sizeof(int), 1, f1);
-            fread(&batchTable[i][j].end, sizeof(int), 1, f1);
-            fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
-            fread(&batchTable[i][j].line, sizeof(int), 1, f1);
-            
-        }
-
-        qsort(batchTable[i], batchCount[i], sizeof(colorBatch), compareColorBatch);
-    }
-
-    fclose(f1);
-
     int byteWidth = fih.biWidth * 3;
     int padding = 4 - byteWidth % 4;
     if (padding == 4) 
@@ -120,6 +96,31 @@ int main(int argc, char** argv) {
 
     LONG w = fih.biWidth;
     LONG h = fih.biHeight;
+
+    BYTE* newData = (BYTE*)mmap(NULL, fih.biSizeImage, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    memset(newData, 0, fih.biSizeImage);
+
+    int batchCount[3];
+    fread(&batchCount[2], sizeof(int), 1, f1); //red
+    fread(&batchCount[1], sizeof(int), 1, f1); //green
+    fread(&batchCount[0], sizeof(int), 1, f1);
+
+    colorBatch* batchTable[3];
+    for(int i = 3-1; i >= 0; i++) { //Red, then green, then blue
+        batchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+        for(int j = 0; j < batchCount[i]; j++) {
+            fread(&batchTable[i][j].start, sizeof(int), 1, f1);
+            fread(&batchTable[i][j].end, sizeof(int), 1, f1);
+            fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
+            fread(&batchTable[i][j].line, sizeof(int), 1, f1);
+
+        }
+
+        qsort(batchTable[i], batchCount[i], sizeof(colorBatch), compareColorBatch);
+    }
+
+    fclose(f1);
 
     int batchCursor[] = {0, 0, 0};
     for (int y = 0; y < h; y++) {
@@ -130,11 +131,19 @@ int main(int argc, char** argv) {
                 while (batchCursor[i] < batchCount[i]) {
                     colorBatch current = batchTable[i][batchCursor[i]];
 
-                    // Batch is fully before current scan position: advance
-                    if (current.line < y || (current.line == y && current.end <= x)) {
+                    //Invalid batches
+                    if(current.start >= w || current.start < 0 || current.line < 0 || current.line >= h) {
                         batchCursor[i]++;
                         continue;
                     }
+
+
+                    // Batch is fully before current scan position: advance
+                    if (current.line < y || (current.line == y && current.end <= x && current.start <= x)) {
+                        batchCursor[i]++;
+                        continue;
+                    }
+
 
                     // Batch is for a future row or starts after current x: stop here,
                     // nothing to cover this pixel for this color
