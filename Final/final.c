@@ -54,17 +54,17 @@ int compareColorBatch(const void *a, const void *b) {
 
 int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
-    if (argc < 2) {
-        printf("Insufficient arguments, try again.\n");
-        printf("Usage: ./decompress input.cwa output.bmp\n");
-        return 0;
-    }
-    char* input = argv[1];
-    char* output = argv[2];
+    // if (argc < 2) {
+    //     printf("Insufficient arguments, try again.\n");
+    //     printf("Usage: ./decompress input.cwa output.bmp\n");
+    //     return 0;
+    // }
+    // char* input = argv[1];
+    // char* output = argv[2];
     
     //Hard-coded Inputs
-    //char *input = "compressed.eck"; 
-    //char *output = "finalImage.bmp"
+    char *input = "compressed.eck"; 
+    char *output = "finalImage.bmp";
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     for(int i = 0; i < 3; i++) {
         batchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-        for(int j = 0; j < batchCount[i]; i++) {
+        for(int j = batchCount[i]-1; j >= 0; j--) {
             fread(&batchTable[i][j].start, sizeof(int), 1, f1);
             fread(&batchTable[i][j].end, sizeof(int), 1, f1);
             fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 
     //Conclude Program
     for(int i = 0; i < 3; i++) {
-        munmap(batchTable[i], batchCount[i] * sizeof(colorBatch))
+        munmap(batchTable[i], batchCount[i] * sizeof(colorBatch));
     }
     munmap(newData, fih.biSizeImage);
     return 0;
