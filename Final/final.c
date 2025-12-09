@@ -127,12 +127,25 @@ int main(int argc, char** argv) {
             int c = x * 3 + y * rwb; // c for cursor
             
             for(int i = 0; i < 3; i++) {
-                colorBatch current = batchTable[i][batchCursor[i]];
+                while (batchCursor[i] < batchCount[i]) {
+                    colorBatch current = batchTable[i][batchCursor[i]];
 
-                if(current.line == y && current.start <= x && current.end > x)
+                    // Batch is fully before current scan position: advance
+                    if (current.line < y || (current.line == y && current.end <= x)) {
+                        batchCursor[i]++;
+                        continue;
+                    }
+
+                    // Batch is for a future row or starts after current x: stop here,
+                    // nothing to cover this pixel for this color
+                    if (current.line > y || current.start > x) {
+                        break;
+                    }
+
+                    // Now we know: current.line == y && current.start <= x < current.end
                     newData[c + i] = current.val;
-                else
-                    batchCursor[i]++;
+                    break;
+                }
             }                
         }
     }
