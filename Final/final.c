@@ -109,15 +109,12 @@ int main(int argc, char** argv) {
     colorBatch* validBatchTable[3]; //There's a lot of garbage in the file
     int valid[] = {0, 0, 0};
 
-    for(int i = 3-1; i >= 0; i++) { //Red, then green, then blue
+    for(int i = 3-1; i >= 0; i--) { //Red, then green, then blue
         batchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         validBatchTable[i] = (colorBatch*)mmap(NULL, batchCount[i] * sizeof(colorBatch), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
         for(int j = 0; j < batchCount[i]; j++) {
-            fread(&batchTable[i][j].start, sizeof(int), 1, f1);
-            fread(&batchTable[i][j].end, sizeof(int), 1, f1);
-            fread(&batchTable[i][j].val, sizeof(BYTE), 1, f1);
-            fread(&batchTable[i][j].line, sizeof(int), 1, f1);
+            fread(&batchTable[i][j], sizeof(colorBatch), 1, f1);
 
             if(batchTable[i][j].line < 0 || batchTable[i][j].line >= h)
                 continue;
@@ -131,13 +128,21 @@ int main(int argc, char** argv) {
             if(batchTable[i][j].start > batchTable[i][j].end)
                 continue;
 
-            validBatchTable[i][valid[i]++] = batchTable[i][j]
+            validBatchTable[i][valid[i]++] = batchTable[i][j];
         }
 
         qsort(validBatchTable[i], valid[i], sizeof(colorBatch), compareColorBatch);
     }
 
     fclose(f1);
+
+
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < valid[i]; j++) {
+            // Debug print
+            printf("Color %d - Line: %d, Start: %d, End: %d, Val: %d\n", i, validBatchTable[i][j].line, validBatchTable[i][j].start, validBatchTable[i][j].end, validBatchTable[i][j].val);
+        }
+    }
 
     int batchCursor[] = {0, 0, 0};
     for (int y = 0; y < h; y++) {
