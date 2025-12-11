@@ -41,6 +41,40 @@ struct {
 
 //Prototypes
 int compareColorBatch(const void *a, const void *b);
+void processImage(int i, LONG w, LONG h, int rwb, colorBatch** validBatchTable, int* valid, BYTE* newData);
+
+void processImage(int i, LONG w, LONG h, int rwb, colorBatch** validBatchTable, int* valid, BYTE* newData) {
+    int batchCursor = 0;
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int c = x * 3 + y * rwb; // c for cursor
+            
+           
+                while (batchCursor < valid[i]) {
+                    colorBatch current = validBatchTable[i][batchCursor];
+
+                    // Batch is fully before current scan position: advance
+                    if (current.line < y || (current.line == y && current.end <= x && current.start <= x)) {
+                        batchCursor++;
+                        continue;
+                    }
+
+
+                    // Batch is for a future row or starts after current x: stop here,
+                    // nothing to cover this pixel for this color
+                    if (current.line > y || current.start > x) {
+                        break;
+                    }
+
+                    // Now we know: current.line == y && current.start <= x < current.end
+                    newData[c + i] = current.val;
+                    break;
+                }
+                            
+        }
+    }
+}
 
 int compareColorBatch(const void *a, const void *b) {
     const colorBatch *ca = a;
@@ -136,43 +170,26 @@ int main(int argc, char** argv) {
 
     fclose(f1);
 
+    struct timeval tv1, tv2;
+    gettimeofday(&tv1, NULL);
 
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < valid[i]; j++) {
-            // Debug print
-            printf("Color %d - Line: %d, Start: %d, End: %d, Val: %d\n", i, validBatchTable[i][j].line, validBatchTable[i][j].start, validBatchTable[i][j].end, validBatchTable[i][j].val);
+    int i = 2;
+    while(i > 0) {
+        int pid = fork();
+        if (pid == 0) {
+            processImage(i, w, h, rwb, validBatchTable, valid, newData);
+            return 0;
         }
+        i--;
     }
 
-    int batchCursor[] = {0, 0, 0};
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            int c = x * 3 + y * rwb; // c for cursor
-            
-            for(int i = 0; i < 3; i++) {
-                while (batchCursor[i] < valid[i]) {
-                    colorBatch current = validBatchTable[i][batchCursor[i]];
+    processImage(i, w, h, rwb, validBatchTable, valid, newData);
 
-                    // Batch is fully before current scan position: advance
-                    if (current.line < y || (current.line == y && current.end <= x && current.start <= x)) {
-                        batchCursor[i]++;
-                        continue;
-                    }
-
-
-                    // Batch is for a future row or starts after current x: stop here,
-                    // nothing to cover this pixel for this color
-                    if (current.line > y || current.start > x) {
-                        break;
-                    }
-
-                    // Now we know: current.line == y && current.start <= x < current.end
-                    newData[c + i] = current.val;
-                    break;
-                }
-            }                
-        }
-    }
+    while(wait(0) != -1); 
+    printf("All processes complete.\n");
+    gettimeofday(&tv2, NULL);
+    long long timing = (tv2.tv_sec - tv1.tv_sec) * 1000000LL + (tv2.tv_usec - tv1.tv_usec);
+    printf("The operation took %lld microseconds.\n", timing);
 
     //Create file
     FILE* lastFile = fopen(output, "wb");
