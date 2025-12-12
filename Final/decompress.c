@@ -91,17 +91,17 @@ int compareColorBatch(const void *a, const void *b) {
 
 int main(int argc, char** argv) {
     //Terminal Inputs (single input file)
-    // if (argc < 2) {
-    //     printf("Insufficient arguments, try again.\n");
-    //     printf("Usage: ./decompress input.cwa output.bmp\n");
-    //     return 0;
-    // }
-    // char* input = argv[1];
-    // char* output = argv[2];
+    if (argc < 2) {
+        printf("Insufficient arguments, try again.\n");
+        printf("Usage: ./decompress input.cwa output.bmp\n");
+        return 0;
+    }
+    char* input = argv[1];
+    char* output = argv[2];
     
     //Hard-coded Inputs
-    char *input = "compressed.eck"; 
-    char *output = "finalImage.bmp";
+    // char *input = "compressed.eck"; 
+    // char *output = "finalImage.bmp";
 
     //Handle input
     FILE* f1 = fopen(input, "rb");
